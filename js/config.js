@@ -6,7 +6,7 @@
 
 const CONFIG = {
   // GASのウェブアプリURL (デプロイ後にここに貼る)
-  GAS_URL: 'https://script.google.com/macros/s/XXXXXXXX/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbw6LC-0u4Bu0xELgbnA83FLWBxl4KMMDsVVMvRACCZvdBitDREqkmdHS7hlZj5HPGS0Mg/exec',
   
   // アプリのバージョン
   VERSION: '0.1.0',
