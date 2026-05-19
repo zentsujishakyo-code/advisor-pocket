@@ -17,7 +17,12 @@ const App = {
     this.loadMyInfo();
     
     document.getElementById('back-button').addEventListener('click', () => {
-      this.navigate('home');
+      // 詳細画面からは一覧に戻る、それ以外はホームに戻る
+      if (this.state.currentView === 'detail') {
+        this.navigate('list');
+      } else {
+        this.navigate('home');
+      }
     });
   },
   
@@ -36,7 +41,7 @@ const App = {
     }
   },
   
-  navigate(viewName) {
+  navigate(viewName, param) {
     this.state.currentView = viewName;
     const main = document.getElementById('main-content');
     const backBtn = document.getElementById('back-button');
@@ -57,6 +62,11 @@ const App = {
         backBtn.style.display = 'block';
         title.textContent = '活動ログを見る';
         Views.list.render(main, this.state);
+        break;
+      case 'detail':
+        backBtn.style.display = 'block';
+        title.textContent = '活動ログ詳細';
+        Views.detail.render(main, this.state, param);
         break;
     }
     window.scrollTo(0, 0);
