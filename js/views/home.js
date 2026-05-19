@@ -30,6 +30,11 @@ Views.home = {
           <div class="menu-card-title">活動ログを見る</div>
           <div class="menu-card-sub">過去事例・検索</div>
         </div>
+        <div class="menu-card" onclick="App.navigate('profile')">
+          <div class="menu-card-icon">◉</div>
+          <div class="menu-card-title">プロフィール</div>
+          <div class="menu-card-sub">連絡先・派遣可否</div>
+        </div>
       </div>
     `;
   }
