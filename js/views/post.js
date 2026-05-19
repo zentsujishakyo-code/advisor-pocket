@@ -7,7 +7,8 @@ Views.post = {
     phase: '',
     title: '',
     content: '',
-    tags: ''
+    tags: '',
+    remarks: ''
   },
   
   render(container, appState) {
@@ -65,6 +66,12 @@ Views.post = {
                  value="${escapeHtml(s.tags)}">
         </div>
         
+        <div class="form-group">
+          <label class="form-label">備考</label>
+          <textarea id="f-remarks" class="form-textarea" 
+                    placeholder="補足や、その他伝えておきたいこと">${escapeHtml(s.remarks)}</textarea>
+        </div>
+        
         <div class="form-buttons">
           <button class="btn btn-secondary" onclick="Views.post.saveDraft()">下書き保存</button>
           <button class="btn btn-primary" onclick="Views.post.submit()">送信する</button>
@@ -88,7 +95,8 @@ Views.post = {
       phase: this.state.phase,
       title: document.getElementById('f-title').value.trim(),
       content: document.getElementById('f-content').value.trim(),
-      tags: document.getElementById('f-tags').value.trim()
+      tags: document.getElementById('f-tags').value.trim(),
+      remarks: document.getElementById('f-remarks').value.trim()
     };
   },
   
@@ -110,7 +118,7 @@ Views.post = {
       await API.post('postLog', data);
       App.showLoading(false);
       localStorage.removeItem('advisor_pocket_draft');
-      this.state = { category: '日報', phase: '', title: '', content: '', tags: '' };
+      this.state = { category: '日報', phase: '', title: '', content: '', tags: '', remarks: '' };
       alert('投稿しました');
       App.navigate('home');
     } catch (e) {
