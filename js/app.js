@@ -68,6 +68,11 @@ const App = {
         title.textContent = '活動ログ詳細';
         Views.detail.render(main, this.state, param);
         break;
+      case 'profile':
+        backBtn.style.display = 'block';
+        title.textContent = 'プロフィール';
+        Views.profile.render(main, this.state);
+        break;
     }
     window.scrollTo(0, 0);
   },
