@@ -77,11 +77,17 @@ Views.list = {
       </div>
     `).join('');
     
-    // 詳細ページへの遷移は Phase 2 で実装。Phase 1ではタップでも何も起きない。
+    // カードのタップで詳細画面に遷移
+    listEl.querySelectorAll('.log-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const recordId = card.dataset.id;
+        App.navigate('detail', recordId);
+      });
+    });
   },
   
   sanitizeCat(cat) {
-    return cat.replace(/[^a-zA-Z\u4e00-\u9faf]/g, '');
+    return cat ? cat.replace(/[^a-zA-Z\u4e00-\u9faf]/g, '') : '';
   }
 };
 
