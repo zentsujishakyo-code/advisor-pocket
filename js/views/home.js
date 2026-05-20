@@ -2,6 +2,39 @@
 // ホーム画面
 // =========================================
 Views.home = {
+  /**
+   * スケルトン表示 (データロード前)
+   */
+  renderSkeleton(container) {
+    container.innerHTML = `
+      <div class="home-profile">
+        <div class="home-profile-name" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 120px;">&nbsp;</div>
+        <div class="home-profile-affiliation" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 180px; margin-top: 4px;">&nbsp;</div>
+      </div>
+      
+      <div class="menu-grid">
+        <div class="menu-card" onclick="App.navigate('post')">
+          <div class="menu-card-icon">✎</div>
+          <div class="menu-card-title">活動ログを書く</div>
+          <div class="menu-card-sub">日報・Tips・失敗談</div>
+        </div>
+        <div class="menu-card" onclick="App.navigate('list')">
+          <div class="menu-card-icon">≡</div>
+          <div class="menu-card-title">活動ログを見る</div>
+          <div class="menu-card-sub">過去事例・検索</div>
+        </div>
+        <div class="menu-card" onclick="App.navigate('profile')">
+          <div class="menu-card-icon">◉</div>
+          <div class="menu-card-title">プロフィール</div>
+          <div class="menu-card-sub">連絡先・派遣可否</div>
+        </div>
+      </div>
+    `;
+  },
+  
+  /**
+   * 完全な表示 (データロード後)
+   */
   render(container, state) {
     const { advisor, currentDispatch } = state;
     
