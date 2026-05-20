@@ -1,30 +1,74 @@
 // =========================================
-// 活動ログ投稿画面
+// 活動ログ投稿/編集画面
 // =========================================
 Views.post = {
   state: {
+    mode: 'new',           // 'new' or 'edit'
+    recordId: null,        // 編集モードの場合のレコードID
     category: '日報',
     phase: '',
     title: '',
     content: '',
     tags: '',
     remarks: '',
-    attachments: []  // [{ data: base64, mimeType, fileName, preview }]
+    existingAttachments: [], // 編集モード時の既存添付 [{fileKey, name, contentType}]
+    newAttachments: []     // 新規追加した添付 [{data, mimeType, fileName, preview}]
   },
   
   MAX_ATTACHMENTS: 3,
   MAX_DIMENSION: 1280,
   
+  /**
+   * 新規モードの初期化
+   */
+  initNew() {
+    this.state = {
+      mode: 'new',
+      recordId: null,
+      category: '日報',
+      phase: '',
+      title: '',
+      content: '',
+      tags: '',
+      remarks: '',
+      existingAttachments: [],
+      newAttachments: []
+    };
+  },
+  
+  /**
+   * 編集モードの初期化 (既存ログの値で埋める)
+   */
+  initEdit(log) {
+    this.state = {
+      mode: 'edit',
+      recordId: log.recordId,
+      category: log.category || '日報',
+      phase: log.phase || '',
+      title: log.title || '',
+      content: log.content || '',
+      tags: log.tags || '',
+      remarks: log.remarks || '',
+      existingAttachments: (log.attachments || []).map(a => ({
+        fileKey: a.fileKey,
+        name: a.name || '',
+        contentType: a.contentType || 'image/jpeg'
+      })),
+      newAttachments: []
+    };
+  },
+  
   render(container, appState) {
     const { advisor, currentDispatch } = appState;
     const s = this.state;
+    const isEdit = s.mode === 'edit';
     
     container.innerHTML = `
       <div class="form-section">
         <div class="form-info">
           <div class="form-info-label">投稿者</div>
           <div class="form-info-value">${escapeHtml(advisor.name)} (${escapeHtml(advisor.affiliation)})</div>
-          ${currentDispatch ? `
+          ${currentDispatch && !isEdit ? `
             <div class="form-info-label" style="margin-top: 6px;">関連案件</div>
             <div class="form-info-value">${escapeHtml(currentDispatch.disasterName)}</div>
           ` : ''}
@@ -91,8 +135,8 @@ Views.post = {
         </div>
         
         <div class="form-buttons">
-          <button class="btn btn-secondary" onclick="Views.post.saveDraft()">下書き保存</button>
-          <button class="btn btn-primary" onclick="Views.post.submit()">送信する</button>
+          <button class="btn btn-secondary" onclick="Views.post.cancel()">${isEdit ? 'キャンセル' : '下書き保存'}</button>
+          <button class="btn btn-primary" onclick="Views.post.submit()">${isEdit ? '更新する' : '送信する'}</button>
         </div>
       </div>
     `;
@@ -108,14 +152,14 @@ Views.post = {
     
     // 写真選択ボタン
     document.getElementById('f-add-photo-btn').addEventListener('click', () => {
-      if (this.state.attachments.length >= this.MAX_ATTACHMENTS) {
+      const total = this.state.existingAttachments.length + this.state.newAttachments.length;
+      if (total >= this.MAX_ATTACHMENTS) {
         alert(`写真は最大${this.MAX_ATTACHMENTS}枚までです`);
         return;
       }
       document.getElementById('f-file-input').click();
     });
     
-    // ファイル選択時
     document.getElementById('f-file-input').addEventListener('change', (e) => {
       this.handleFileSelect(e.target.files);
     });
@@ -123,12 +167,10 @@ Views.post = {
     this.renderAttachmentsPreview();
   },
   
-  /**
-   * ファイル選択時の処理 - リサイズしてstateに保存
-   */
   async handleFileSelect(files) {
     for (const file of files) {
-      if (this.state.attachments.length >= this.MAX_ATTACHMENTS) {
+      const total = this.state.existingAttachments.length + this.state.newAttachments.length;
+      if (total >= this.MAX_ATTACHMENTS) {
         alert(`写真は最大${this.MAX_ATTACHMENTS}枚までです`);
         break;
       }
@@ -140,20 +182,16 @@ Views.post = {
       
       try {
         const resized = await this.resizeImage(file, this.MAX_DIMENSION);
-        this.state.attachments.push(resized);
+        this.state.newAttachments.push(resized);
         this.renderAttachmentsPreview();
       } catch (e) {
         alert('画像の処理に失敗しました: ' + e.message);
       }
     }
     
-    // ファイル選択欄を空にして、同じファイルを再選択できるように
     document.getElementById('f-file-input').value = '';
   },
   
-  /**
-   * 画像を指定サイズにリサイズしてBase64で返す
-   */
   resizeImage(file, maxDimension) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -162,7 +200,6 @@ Views.post = {
         img.onload = () => {
           let { width, height } = img;
           
-          // 長辺を maxDimension に合わせて縮小
           if (width > height) {
             if (width > maxDimension) {
               height = Math.round(height * maxDimension / width);
@@ -181,7 +218,6 @@ Views.post = {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           
-          // JPEG形式・品質85%でエンコード
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           const base64 = dataUrl.split(',')[1];
           
@@ -189,8 +225,7 @@ Views.post = {
             data: base64,
             mimeType: 'image/jpeg',
             fileName: file.name.replace(/\.[^.]+$/, '.jpg'),
-            preview: dataUrl,
-            size: Math.round(base64.length * 3 / 4)
+            preview: dataUrl
           });
         };
         img.onerror = () => reject(new Error('画像読み込み失敗'));
@@ -201,38 +236,78 @@ Views.post = {
     });
   },
   
-  /**
-   * 添付ファイルプレビューを描画
-   */
   renderAttachmentsPreview() {
     const previewEl = document.getElementById('attachments-preview');
     if (!previewEl) return;
     
-    previewEl.innerHTML = this.state.attachments.map((att, i) => `
-      <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border);">
-        <img src="${att.preview}" style="width: 100%; height: 100%; object-fit: cover;">
-        <button type="button" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 12px; line-height: 1; cursor: pointer;">×</button>
+    const existingHtml = this.state.existingAttachments.map((att, i) => `
+      <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border); background: var(--color-surface-alt);" data-existing-index="${i}">
+        <div class="att-img-slot" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-text-muted);">読み込み中...</div>
+        <button type="button" data-type="existing" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 12px; line-height: 1; cursor: pointer;">×</button>
       </div>
     `).join('');
     
+    const newHtml = this.state.newAttachments.map((att, i) => `
+      <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border);">
+        <img src="${att.preview}" style="width: 100%; height: 100%; object-fit: cover;">
+        <button type="button" data-type="new" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 12px; line-height: 1; cursor: pointer;">×</button>
+      </div>
+    `).join('');
+    
+    previewEl.innerHTML = existingHtml + newHtml;
+    
+    // 既存添付ファイルの画像を非同期で読み込む
+    this.state.existingAttachments.forEach((att, i) => {
+      this.loadExistingAttachment(att, i);
+    });
+    
+    // 削除ボタン
     previewEl.querySelectorAll('.remove-attachment').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        const type = e.target.dataset.type;
         const idx = parseInt(e.target.dataset.index, 10);
-        this.state.attachments.splice(idx, 1);
+        if (type === 'existing') {
+          this.state.existingAttachments.splice(idx, 1);
+        } else {
+          this.state.newAttachments.splice(idx, 1);
+        }
         this.renderAttachmentsPreview();
       });
     });
   },
   
+  /**
+   * 既存の添付ファイル(fileKey)から画像を読み込んでプレビュー表示
+   */
+  async loadExistingAttachment(att, index) {
+    try {
+      const token = getToken();
+      const url = `${CONFIG.GAS_URL}?action=getFile&token=${encodeURIComponent(token)}&fileKey=${encodeURIComponent(att.fileKey)}`;
+      const res = await fetch(url);
+      const base64 = await res.text();
+      const dataUrl = `data:${att.contentType || 'image/jpeg'};base64,${base64}`;
+      
+      const slotEl = document.querySelector(`[data-existing-index="${index}"] .att-img-slot`);
+      if (slotEl) {
+        slotEl.innerHTML = `<img src="${dataUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        slotEl.style.padding = '0';
+      }
+    } catch (e) {
+      // 失敗時は「読み込み中...」のまま残る
+    }
+  },
+  
   collectValues() {
     return {
+      recordId: this.state.recordId,
       category: document.getElementById('f-category').value,
       phase: this.state.phase,
       title: document.getElementById('f-title').value.trim(),
       content: document.getElementById('f-content').value.trim(),
       tags: document.getElementById('f-tags').value.trim(),
       remarks: document.getElementById('f-remarks').value.trim(),
-      attachments: this.state.attachments.map(a => ({
+      existingAttachments: this.state.existingAttachments.map(a => a.fileKey),
+      newAttachments: this.state.newAttachments.map(a => ({
         data: a.data,
         mimeType: a.mimeType,
         fileName: a.fileName
@@ -240,12 +315,18 @@ Views.post = {
     };
   },
   
-  saveDraft() {
-    const data = this.collectValues();
-    // 添付ファイル(Base64)はLocalStorage容量を圧迫するため、下書きには含めない
-    delete data.attachments;
-    localStorage.setItem('advisor_pocket_draft', JSON.stringify(data));
-    alert('下書きを保存しました (写真は下書きに含まれません)');
+  cancel() {
+    if (this.state.mode === 'edit') {
+      // 編集モードのキャンセル: 詳細画面に戻る
+      App.navigate('detail', this.state.recordId);
+    } else {
+      // 新規モードの「下書き保存」: LocalStorageに退避
+      const data = this.collectValues();
+      delete data.newAttachments;
+      delete data.existingAttachments;
+      localStorage.setItem('advisor_pocket_draft', JSON.stringify(data));
+      alert('下書きを保存しました (写真は下書きに含まれません)');
+    }
   },
   
   async submit() {
@@ -255,20 +336,38 @@ Views.post = {
     if (!data.content) { alert('内容を入力してください'); return; }
     if (!data.category) { alert('種別を選択してください'); return; }
     
+    const isEdit = this.state.mode === 'edit';
+    const action = isEdit ? 'updateLog' : 'postLog';
+    
+    // 新規投稿の場合は attachments を従来形式に
+    if (!isEdit) {
+      data.attachments = data.newAttachments;
+      delete data.existingAttachments;
+      delete data.newAttachments;
+    }
+    
     App.showLoading(true);
     try {
-      await API.post('postLog', data);
+      await API.post(action, data);
       App.showLoading(false);
-      localStorage.removeItem('advisor_pocket_draft');
-      this.state = { 
-        category: '日報', phase: '', title: '', content: '', 
-        tags: '', remarks: '', attachments: [] 
-      };
-      alert('投稿しました');
-      App.navigate('home');
+      
+      if (!isEdit) {
+        localStorage.removeItem('advisor_pocket_draft');
+      }
+      
+      const recordId = this.state.recordId;
+      this.initNew();  // stateをリセット
+      
+      alert(isEdit ? '更新しました' : '投稿しました');
+      
+      if (isEdit) {
+        App.navigate('detail', recordId);
+      } else {
+        App.navigate('home');
+      }
     } catch (e) {
       App.showLoading(false);
-      App.showError('投稿に失敗しました: ' + e.message);
+      App.showError((isEdit ? '更新' : '投稿') + 'に失敗しました: ' + e.message);
     }
   }
 };
