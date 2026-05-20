@@ -5,7 +5,19 @@ Views.list = {
   state: {
     filter: 'all',
     logs: [],
-    loaded: false
+    loaded: false,
+    cacheTime: 0,  // キャッシュ取得時刻 (ms)
+  },
+  
+  CACHE_TTL: 5 * 60 * 1000,  // キャッシュ有効期限: 5分
+  
+  /**
+   * キャッシュを破棄する (投稿・編集・削除後に呼ぶ)
+   */
+  invalidateCache() {
+    this.state.logs = [];
+    this.state.loaded = false;
+    this.state.cacheTime = 0;
   },
   
   async render(container, appState) {
@@ -20,24 +32,40 @@ Views.list = {
         </div>
       </div>
       <div class="log-list" id="log-list">
-        <div style="padding: 40px; text-align: center; color: var(--color-text-light);">
-          読み込み中...
-        </div>
+        ${this.state.loaded ? '' : '<div style="padding: 40px; text-align: center; color: var(--color-text-light);">読み込み中...</div>'}
       </div>
     `;
     
     container.querySelectorAll('#filter-pills .filter-pill').forEach(pill => {
       pill.addEventListener('click', () => {
-        this.state.filter = pill.dataset.value;
-        this.render(container, appState);
+        if (this.state.filter !== pill.dataset.value) {
+          this.state.filter = pill.dataset.value;
+          // フィルタを変えたらキャッシュを破棄して最新を取り直す
+          this.invalidateCache();
+          this.render(container, appState);
+        }
       });
     });
     
+    // キャッシュがあればすぐ表示
+    const cacheAge = Date.now() - this.state.cacheTime;
+    if (this.state.loaded && cacheAge < this.CACHE_TTL) {
+      this.renderList(container);
+      // 裏で最新を取りに行く (バックグラウンド更新)
+      this.loadLogs(true).then(() => {
+        if (App.state.currentView === 'list') {
+          this.renderList(container);
+        }
+      });
+      return;
+    }
+    
+    // キャッシュが無い/期限切れの場合はロード待ち
     await this.loadLogs();
     this.renderList(container);
   },
   
-  async loadLogs() {
+  async loadLogs(silent) {
     try {
       const data = await API.get('getLogs', { 
         category: this.state.filter,
@@ -45,13 +73,18 @@ Views.list = {
       });
       this.state.logs = data.logs || [];
       this.state.loaded = true;
+      this.state.cacheTime = Date.now();
     } catch (e) {
-      App.showError('一覧の取得に失敗しました: ' + e.message);
+      if (!silent) {
+        App.showError('一覧の取得に失敗しました: ' + e.message);
+      }
     }
   },
   
   renderList(container) {
     const listEl = container.querySelector('#log-list');
+    if (!listEl) return;
+    
     if (this.state.logs.length === 0) {
       listEl.innerHTML = `
         <div style="padding: 40px; text-align: center; color: var(--color-text-light);">
@@ -77,7 +110,6 @@ Views.list = {
       </div>
     `).join('');
     
-    // カードのタップで詳細画面に遷移
     listEl.querySelectorAll('.log-card').forEach(card => {
       card.addEventListener('click', () => {
         const recordId = card.dataset.id;
