@@ -201,6 +201,12 @@ Views.detail = {
     try {
       await API.post('deleteLog', { recordId: this.state.log.recordId });
       App.showLoading(false);
+
+      // 削除が成功したら一覧キャッシュを破棄
+      if (Views.list && Views.list.invalidateCache) {
+        Views.list.invalidateCache();
+      }
+      
       alert('削除しました');
       App.navigate('list');
     } catch (e) {
