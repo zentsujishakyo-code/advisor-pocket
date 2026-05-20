@@ -5,10 +5,13 @@ Views.detail = {
   state: {
     log: null,
     loading: false,
-    imageCache: {}  // fileKey -> dataURL のキャッシュ
+    imageCache: {},
+    appState: null  // App.stateを保持(編集権限判定用)
   },
   
   async render(container, appState, recordId) {
+    this.state.appState = appState;
+    
     if (recordId) {
       this.state.loading = true;
       this.state.log = null;
@@ -40,10 +43,27 @@ Views.detail = {
   
   renderLog(container) {
     const log = this.state.log;
+    const advisor = this.state.appState.advisor;
     const hasAttachments = log.attachments && log.attachments.length > 0;
+    
+    // 投稿者本人なら編集・削除ボタンを表示
+    const isOwner = advisor && log.authorName === advisor.name;
     
     container.innerHTML = `
       <div class="form-section">
+        ${isOwner ? `
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px;">
+            <button onclick="Views.detail.editLog()" 
+                    style="background: var(--color-surface); border: 0.5px solid var(--color-border); color: var(--color-text); padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer;">
+              編集
+            </button>
+            <button onclick="Views.detail.deleteLog()" 
+                    style="background: var(--color-surface); border: 0.5px solid var(--color-danger); color: var(--color-danger); padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer;">
+              削除
+            </button>
+          </div>
+        ` : ''}
+        
         <div class="log-badges" style="margin-bottom: 12px;">
           <span class="badge badge-cat-${this.sanitizeCat(log.category)}">${escapeHtml(log.category)}</span>
           ${log.phase ? `<span class="badge badge-phase">${escapeHtml(log.phase)}</span>` : ''}
@@ -107,9 +127,6 @@ Views.detail = {
     `;
   },
   
-  /**
-   * 添付写真を順次読み込み
-   */
   async loadAttachments() {
     const log = this.state.log;
     if (!log || !log.attachments || log.attachments.length === 0) return;
@@ -140,9 +157,6 @@ Views.detail = {
     }
   },
   
-  /**
-   * fileKey からファイルバイナリ(Base64)を取得
-   */
   fetchFileAsBase64(fileKey) {
     return new Promise((resolve, reject) => {
       const token = getToken();
@@ -165,6 +179,34 @@ Views.detail = {
   
   closeModal() {
     document.getElementById('image-modal').style.display = 'none';
+  },
+  
+  /**
+   * 編集ボタンをタップ
+   */
+  editLog() {
+    Views.post.initEdit(this.state.log);
+    App.navigate('post');
+  },
+  
+  /**
+   * 削除ボタンをタップ
+   */
+  async deleteLog() {
+    if (!confirm('この活動ログを削除します。よろしいですか？\nこの操作は取り消せません。')) {
+      return;
+    }
+    
+    App.showLoading(true);
+    try {
+      await API.post('deleteLog', { recordId: this.state.log.recordId });
+      App.showLoading(false);
+      alert('削除しました');
+      App.navigate('list');
+    } catch (e) {
+      App.showLoading(false);
+      App.showError('削除に失敗しました: ' + e.message);
+    }
   },
   
   sanitizeCat(cat) {
