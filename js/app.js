@@ -17,8 +17,16 @@ const App = {
     this.loadMyInfo();
     
     document.getElementById('back-button').addEventListener('click', () => {
-      // 詳細画面からは一覧に戻る、それ以外はホームに戻る
-      if (this.state.currentView === 'detail') {
+      // 戻るボタンの動作:
+      // 編集中の投稿画面 → 詳細画面に戻る
+      // 通常の投稿画面 → ホームに戻る
+      // 詳細画面 → 一覧に戻る
+      // それ以外 → ホームに戻る
+      if (this.state.currentView === 'post' && Views.post.state.mode === 'edit') {
+        const recordId = Views.post.state.recordId;
+        Views.post.initNew();  // stateリセット
+        this.navigate('detail', recordId);
+      } else if (this.state.currentView === 'detail') {
         this.navigate('list');
       } else {
         this.navigate('home');
@@ -42,6 +50,7 @@ const App = {
   },
   
   navigate(viewName, param) {
+    const prevView = this.state.currentView;
     this.state.currentView = viewName;
     const main = document.getElementById('main-content');
     const backBtn = document.getElementById('back-button');
@@ -55,7 +64,12 @@ const App = {
         break;
       case 'post':
         backBtn.style.display = 'block';
-        title.textContent = '活動ログを書く';
+        // 新規モードに切り替えるのは、ホームから来た場合だけ
+        // (詳細画面から「編集」で来た場合は、すでにinitEdit済みなのでそのまま使う)
+        if (prevView === 'home' || prevView === null) {
+          Views.post.initNew();
+        }
+        title.textContent = Views.post.state.mode === 'edit' ? '活動ログを編集' : '活動ログを書く';
         Views.post.render(main, this.state);
         break;
       case 'list':
