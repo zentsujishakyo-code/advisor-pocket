@@ -14,17 +14,20 @@ const App = {
       this.showError('アクセス権限がありません。県社協担当者にお問い合わせください。');
       return;
     }
+    
+    // ヘッダーをすぐ表示してスケルトンを描画 (体感速度UP)
+    document.getElementById('app-header').style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+    Views.home.renderSkeleton(document.getElementById('main-content'));
+    this.state.currentView = 'home';
+    
+    // データ読み込みは裏で実行
     this.loadMyInfo();
     
     document.getElementById('back-button').addEventListener('click', () => {
-      // 戻るボタンの動作:
-      // 編集中の投稿画面 → 詳細画面に戻る
-      // 通常の投稿画面 → ホームに戻る
-      // 詳細画面 → 一覧に戻る
-      // それ以外 → ホームに戻る
       if (this.state.currentView === 'post' && Views.post.state.mode === 'edit') {
         const recordId = Views.post.state.recordId;
-        Views.post.initNew();  // stateリセット
+        Views.post.initNew();
         this.navigate('detail', recordId);
       } else if (this.state.currentView === 'detail') {
         this.navigate('list');
@@ -36,15 +39,15 @@ const App = {
   
   async loadMyInfo() {
     try {
-      this.showLoading(true);
       const data = await API.get('getMyInfo');
       this.state.advisor = data.advisor;
       this.state.currentDispatch = data.currentDispatch;
-      this.showLoading(false);
-      document.getElementById('app-header').style.display = 'block';
-      this.navigate('home');
+      
+      // ホーム画面表示中なら本物のデータで再描画
+      if (this.state.currentView === 'home') {
+        Views.home.render(document.getElementById('main-content'), this.state);
+      }
     } catch (e) {
-      this.showLoading(false);
       this.showError('情報の取得に失敗しました: ' + e.message);
     }
   },
@@ -60,12 +63,15 @@ const App = {
       case 'home':
         backBtn.style.display = 'none';
         title.textContent = 'アドバイザーポケット';
-        Views.home.render(main, this.state);
+        // データが揃っていればフル描画、まだなら再度スケルトン
+        if (this.state.advisor) {
+          Views.home.render(main, this.state);
+        } else {
+          Views.home.renderSkeleton(main);
+        }
         break;
       case 'post':
         backBtn.style.display = 'block';
-        // 新規モードに切り替えるのは、ホームから来た場合だけ
-        // (詳細画面から「編集」で来た場合は、すでにinitEdit済みなのでそのまま使う)
         if (prevView === 'home' || prevView === null) {
           Views.post.initNew();
         }
