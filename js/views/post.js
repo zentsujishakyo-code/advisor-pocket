@@ -350,6 +350,10 @@ Views.post = {
     try {
       await API.post(action, data);
       App.showLoading(false);
+
+      // 投稿/編集が成功したら一覧キャッシュを破棄
+      if (Views.list && Views.list.invalidateCache) {
+        Views.list.invalidateCache();
       
       if (!isEdit) {
         localStorage.removeItem('advisor_pocket_draft');
