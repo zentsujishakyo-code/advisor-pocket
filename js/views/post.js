@@ -3,24 +3,21 @@
 // =========================================
 Views.post = {
   state: {
-    mode: 'new',           // 'new' or 'edit'
-    recordId: null,        // 編集モードの場合のレコードID
+    mode: 'new',
+    recordId: null,
     category: '日報',
     phase: '',
     title: '',
     content: '',
     tags: '',
     remarks: '',
-    existingAttachments: [], // 編集モード時の既存添付 [{fileKey, name, contentType}]
-    newAttachments: []     // 新規追加した添付 [{data, mimeType, fileName, preview}]
+    existingAttachments: [],
+    newAttachments: []
   },
   
   MAX_ATTACHMENTS: 3,
   MAX_DIMENSION: 1280,
   
-  /**
-   * 新規モードの初期化
-   */
   initNew() {
     this.state = {
       mode: 'new',
@@ -36,9 +33,6 @@ Views.post = {
     };
   },
   
-  /**
-   * 編集モードの初期化 (既存ログの値で埋める)
-   */
   initEdit(log) {
     this.state = {
       mode: 'edit',
@@ -117,7 +111,6 @@ Views.post = {
         <div class="form-group">
           <label class="form-label">写真 (最大${this.MAX_ATTACHMENTS}枚)</label>
           <div id="attachments-preview" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-            <!-- プレビューはJSで動的描画 -->
           </div>
           <input type="file" id="f-file-input" accept="image/*" multiple style="display: none;">
           <button type="button" id="f-add-photo-btn" class="btn btn-secondary" style="width: 100%; height: 40px;">
@@ -141,7 +134,6 @@ Views.post = {
       </div>
     `;
     
-    // フェーズピル
     container.querySelectorAll('#f-phase-group .pill').forEach(pill => {
       pill.addEventListener('click', () => {
         container.querySelectorAll('#f-phase-group .pill').forEach(p => p.classList.remove('active'));
@@ -150,7 +142,6 @@ Views.post = {
       });
     });
     
-    // 写真選択ボタン
     document.getElementById('f-add-photo-btn').addEventListener('click', () => {
       const total = this.state.existingAttachments.length + this.state.newAttachments.length;
       if (total >= this.MAX_ATTACHMENTS) {
@@ -256,12 +247,10 @@ Views.post = {
     
     previewEl.innerHTML = existingHtml + newHtml;
     
-    // 既存添付ファイルの画像を非同期で読み込む
     this.state.existingAttachments.forEach((att, i) => {
       this.loadExistingAttachment(att, i);
     });
     
-    // 削除ボタン
     previewEl.querySelectorAll('.remove-attachment').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const type = e.target.dataset.type;
@@ -276,9 +265,6 @@ Views.post = {
     });
   },
   
-  /**
-   * 既存の添付ファイル(fileKey)から画像を読み込んでプレビュー表示
-   */
   async loadExistingAttachment(att, index) {
     try {
       const token = getToken();
@@ -317,10 +303,8 @@ Views.post = {
   
   cancel() {
     if (this.state.mode === 'edit') {
-      // 編集モードのキャンセル: 詳細画面に戻る
       App.navigate('detail', this.state.recordId);
     } else {
-      // 新規モードの「下書き保存」: LocalStorageに退避
       const data = this.collectValues();
       delete data.newAttachments;
       delete data.existingAttachments;
@@ -339,7 +323,6 @@ Views.post = {
     const isEdit = this.state.mode === 'edit';
     const action = isEdit ? 'updateLog' : 'postLog';
     
-    // 新規投稿の場合は attachments を従来形式に
     if (!isEdit) {
       data.attachments = data.newAttachments;
       delete data.existingAttachments;
@@ -350,17 +333,18 @@ Views.post = {
     try {
       await API.post(action, data);
       App.showLoading(false);
-
+      
       // 投稿/編集が成功したら一覧キャッシュを破棄
       if (Views.list && Views.list.invalidateCache) {
         Views.list.invalidateCache();
+      }
       
       if (!isEdit) {
         localStorage.removeItem('advisor_pocket_draft');
       }
       
       const recordId = this.state.recordId;
-      this.initNew();  // stateをリセット
+      this.initNew();
       
       alert(isEdit ? '更新しました' : '投稿しました');
       
