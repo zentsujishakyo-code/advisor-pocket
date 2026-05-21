@@ -9,19 +9,36 @@ Views.post = {
     phase: '',
     title: '',
     content: '',
-    selectedTags: [],     // 選択中の定型タグ配列
-    otherTags: '',         // 「その他」用の自由入力
-    showOtherInput: false, // 「その他」入力欄を表示するか
+    selectedTags: [],
+    otherTags: '',
+    showOtherInput: false,
     remarks: '',
-    postedDate: '',        // 'YYYY-MM-DDTHH:mm' 形式
+    postedDate: '',
     existingAttachments: [],
     newAttachments: []
   },
   
   MAX_ATTACHMENTS: 3,
-  MAX_DIMENSION: 1280,
+  MAX_IMAGE_DIMENSION: 1280,
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
   
-  // 定型タグの候補
+  // 許可するファイル形式
+  ALLOWED_MIME_TYPES: [
+    // 画像
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    // PDF
+    'application/pdf',
+    // Word
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Excel
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    // PowerPoint
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ],
+  
   PRESET_TAGS: [
     'ニーズ受付', 'マッチング', '資機材', '広報', '安全管理',
     '連携', '受付・運営', '移動・送迎', '衛生・健康', 'ガイダンス'
@@ -46,7 +63,6 @@ Views.post = {
   },
   
   initEdit(log) {
-    // 既存タグ文字列を分解
     const tagArray = (log.tags || '').split(',').map(t => t.trim()).filter(t => t);
     const presetTags = tagArray.filter(t => this.PRESET_TAGS.indexOf(t) !== -1);
     const otherTagsArr = tagArray.filter(t => this.PRESET_TAGS.indexOf(t) === -1);
@@ -66,15 +82,12 @@ Views.post = {
       existingAttachments: (log.attachments || []).map(a => ({
         fileKey: a.fileKey,
         name: a.name || '',
-        contentType: a.contentType || 'image/jpeg'
+        contentType: a.contentType || 'application/octet-stream'
       })),
       newAttachments: []
     };
   },
   
-  /**
-   * 現在時刻を 'YYYY-MM-DDTHH:mm' 形式で返す (datetime-local input用)
-   */
   getNowLocalString() {
     const d = new Date();
     const y = d.getFullYear();
@@ -85,9 +98,6 @@ Views.post = {
     return `${y}-${m}-${day}T${h}:${min}`;
   },
   
-  /**
-   * ISO文字列を 'YYYY-MM-DDTHH:mm' 形式に変換 (ローカル時刻)
-   */
   toLocalString(isoString) {
     if (!isoString) return this.getNowLocalString();
     const d = new Date(isoString);
@@ -98,6 +108,20 @@ Views.post = {
     const h = String(d.getHours()).padStart(2, '0');
     const min = String(d.getMinutes()).padStart(2, '0');
     return `${y}-${m}-${day}T${h}:${min}`;
+  },
+  
+  isImage(mimeType) {
+    return mimeType && mimeType.startsWith('image/');
+  },
+  
+  getFileIcon(mimeType) {
+    if (!mimeType) return '📎';
+    if (mimeType.startsWith('image/')) return '🖼️';
+    if (mimeType === 'application/pdf') return '📄';
+    if (mimeType.indexOf('word') !== -1) return '📝';
+    if (mimeType.indexOf('sheet') !== -1 || mimeType.indexOf('excel') !== -1) return '📊';
+    if (mimeType.indexOf('presentation') !== -1 || mimeType.indexOf('powerpoint') !== -1) return '📽️';
+    return '📎';
   },
   
   render(container, appState) {
@@ -169,15 +193,15 @@ Views.post = {
         </div>
         
         <div class="form-group">
-          <label class="form-label">写真 (最大${this.MAX_ATTACHMENTS}枚)</label>
+          <label class="form-label">添付ファイル (写真・PDF・Office、最大${this.MAX_ATTACHMENTS}個)</label>
           <div id="attachments-preview" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
           </div>
-          <input type="file" id="f-file-input" accept="image/*" multiple style="display: none;">
+          <input type="file" id="f-file-input" accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" multiple style="display: none;">
           <button type="button" id="f-add-photo-btn" class="btn btn-secondary" style="width: 100%; height: 44px;">
-            写真を選ぶ・撮る
+            ファイルを選ぶ・撮る
           </button>
           <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 6px;">
-            自動で長辺${this.MAX_DIMENSION}pxに縮小されます
+            写真は長辺${this.MAX_IMAGE_DIMENSION}pxに自動縮小。資料(PDF等)は1ファイル最大10MB。
           </div>
         </div>
         
@@ -197,7 +221,6 @@ Views.post = {
     container.querySelectorAll('#f-phase-group .pill').forEach(pill => {
       pill.addEventListener('click', () => {
         const val = pill.dataset.value;
-        // 同じものをタップしたら解除
         if (this.state.phase === val) {
           this.state.phase = '';
           pill.classList.remove('active');
@@ -231,11 +254,11 @@ Views.post = {
       });
     });
     
-    // 写真選択
+    // ファイル選択
     document.getElementById('f-add-photo-btn').addEventListener('click', () => {
       const total = this.state.existingAttachments.length + this.state.newAttachments.length;
       if (total >= this.MAX_ATTACHMENTS) {
-        alert(`写真は最大${this.MAX_ATTACHMENTS}枚までです`);
+        alert(`添付は最大${this.MAX_ATTACHMENTS}個までです`);
         return;
       }
       document.getElementById('f-file-input').click();
@@ -252,25 +275,60 @@ Views.post = {
     for (const file of files) {
       const total = this.state.existingAttachments.length + this.state.newAttachments.length;
       if (total >= this.MAX_ATTACHMENTS) {
-        alert(`写真は最大${this.MAX_ATTACHMENTS}枚までです`);
+        alert(`添付は最大${this.MAX_ATTACHMENTS}個までです`);
         break;
       }
       
-      if (!file.type.startsWith('image/')) {
-        alert('画像ファイルを選択してください');
+      // 形式チェック
+      const isAllowed = this.ALLOWED_MIME_TYPES.indexOf(file.type) !== -1 
+                     || file.type.startsWith('image/');
+      if (!isAllowed) {
+        alert(`このファイル形式は対応していません: ${file.name}\n対応: 画像、PDF、Word、Excel、PowerPoint`);
+        continue;
+      }
+      
+      // サイズチェック (画像以外は10MBまで)
+      if (!this.isImage(file.type) && file.size > this.MAX_FILE_SIZE) {
+        alert(`ファイルサイズが大きすぎます: ${file.name} (${Math.round(file.size/1024/1024)}MB)\n上限は10MBです`);
         continue;
       }
       
       try {
-        const resized = await this.resizeImage(file, this.MAX_DIMENSION);
-        this.state.newAttachments.push(resized);
+        if (this.isImage(file.type)) {
+          // 画像はリサイズ
+          const resized = await this.resizeImage(file, this.MAX_IMAGE_DIMENSION);
+          this.state.newAttachments.push(resized);
+        } else {
+          // それ以外はそのまま
+          const base64 = await this.fileToBase64(file);
+          this.state.newAttachments.push({
+            data: base64,
+            mimeType: file.type,
+            fileName: file.name,
+            preview: null,
+            size: file.size
+          });
+        }
         this.renderAttachmentsPreview();
       } catch (e) {
-        alert('画像の処理に失敗しました: ' + e.message);
+        alert('ファイルの処理に失敗しました: ' + e.message);
       }
     }
     
     document.getElementById('f-file-input').value = '';
+  },
+  
+  fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        const base64 = dataUrl.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('読み込み失敗'));
+      reader.readAsDataURL(file);
+    });
   },
   
   resizeImage(file, maxDimension) {
@@ -321,24 +379,46 @@ Views.post = {
     const previewEl = document.getElementById('attachments-preview');
     if (!previewEl) return;
     
-    const existingHtml = this.state.existingAttachments.map((att, i) => `
-      <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border); background: var(--color-surface-alt);" data-existing-index="${i}">
-        <div class="att-img-slot" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-text-muted);">読み込み中...</div>
+    const existingHtml = this.state.existingAttachments.map((att, i) => {
+      const isImg = this.isImage(att.contentType);
+      const icon = this.getFileIcon(att.contentType);
+      return `
+      <div style="position: relative; width: 90px; min-height: 90px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border); background: var(--color-surface-alt);" data-existing-index="${i}">
+        ${isImg 
+          ? `<div class="att-img-slot" style="width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-text-muted);">読み込み中...</div>`
+          : `<div style="width: 90px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; text-align: center;">
+              <div style="font-size: 28px; line-height: 1;">${icon}</div>
+              <div style="font-size: 10px; color: var(--color-text-muted); margin-top: 4px; word-break: break-all; line-height: 1.2;">${escapeHtml((att.name || '').substring(0, 20))}</div>
+            </div>`
+        }
         <button type="button" data-type="existing" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 14px; line-height: 1; cursor: pointer;">×</button>
       </div>
-    `).join('');
+    `;
+    }).join('');
     
-    const newHtml = this.state.newAttachments.map((att, i) => `
-      <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border);">
-        <img src="${att.preview}" style="width: 100%; height: 100%; object-fit: cover;">
+    const newHtml = this.state.newAttachments.map((att, i) => {
+      const isImg = this.isImage(att.mimeType);
+      const icon = this.getFileIcon(att.mimeType);
+      return `
+      <div style="position: relative; width: 90px; min-height: 90px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border);">
+        ${isImg && att.preview
+          ? `<img src="${att.preview}" style="width: 90px; height: 90px; object-fit: cover;">`
+          : `<div style="width: 90px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; text-align: center; background: var(--color-surface-alt);">
+              <div style="font-size: 28px; line-height: 1;">${icon}</div>
+              <div style="font-size: 10px; color: var(--color-text-muted); margin-top: 4px; word-break: break-all; line-height: 1.2;">${escapeHtml((att.fileName || '').substring(0, 20))}</div>
+            </div>`
+        }
         <button type="button" data-type="new" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 14px; line-height: 1; cursor: pointer;">×</button>
       </div>
-    `).join('');
+    `;
+    }).join('');
     
     previewEl.innerHTML = existingHtml + newHtml;
     
     this.state.existingAttachments.forEach((att, i) => {
-      this.loadExistingAttachment(att, i);
+      if (this.isImage(att.contentType)) {
+        this.loadExistingAttachment(att, i);
+      }
     });
     
     previewEl.querySelectorAll('.remove-attachment').forEach(btn => {
@@ -373,9 +453,6 @@ Views.post = {
     }
   },
   
-  /**
-   * タグをまとめてカンマ区切り文字列に
-   */
   buildTagsString() {
     const tags = this.state.selectedTags.slice();
     if (this.state.showOtherInput) {
@@ -417,7 +494,7 @@ Views.post = {
       delete data.newAttachments;
       delete data.existingAttachments;
       localStorage.setItem('advisor_pocket_draft', JSON.stringify(data));
-      alert('下書きを保存しました (写真は下書きに含まれません)');
+      alert('下書きを保存しました (添付ファイルは下書きに含まれません)');
     }
   },
   
