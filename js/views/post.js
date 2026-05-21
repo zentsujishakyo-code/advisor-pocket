@@ -9,14 +9,23 @@ Views.post = {
     phase: '',
     title: '',
     content: '',
-    tags: '',
+    selectedTags: [],     // 選択中の定型タグ配列
+    otherTags: '',         // 「その他」用の自由入力
+    showOtherInput: false, // 「その他」入力欄を表示するか
     remarks: '',
+    postedDate: '',        // 'YYYY-MM-DDTHH:mm' 形式
     existingAttachments: [],
     newAttachments: []
   },
   
   MAX_ATTACHMENTS: 3,
   MAX_DIMENSION: 1280,
+  
+  // 定型タグの候補
+  PRESET_TAGS: [
+    'ニーズ受付', 'マッチング', '資機材', '広報', '安全管理',
+    '連携', '受付・運営', '移動・送迎', '衛生・健康', 'ガイダンス'
+  ],
   
   initNew() {
     this.state = {
@@ -26,14 +35,22 @@ Views.post = {
       phase: '',
       title: '',
       content: '',
-      tags: '',
+      selectedTags: [],
+      otherTags: '',
+      showOtherInput: false,
       remarks: '',
+      postedDate: this.getNowLocalString(),
       existingAttachments: [],
       newAttachments: []
     };
   },
   
   initEdit(log) {
+    // 既存タグ文字列を分解
+    const tagArray = (log.tags || '').split(',').map(t => t.trim()).filter(t => t);
+    const presetTags = tagArray.filter(t => this.PRESET_TAGS.indexOf(t) !== -1);
+    const otherTagsArr = tagArray.filter(t => this.PRESET_TAGS.indexOf(t) === -1);
+    
     this.state = {
       mode: 'edit',
       recordId: log.recordId,
@@ -41,8 +58,11 @@ Views.post = {
       phase: log.phase || '',
       title: log.title || '',
       content: log.content || '',
-      tags: log.tags || '',
+      selectedTags: presetTags,
+      otherTags: otherTagsArr.join(', '),
+      showOtherInput: otherTagsArr.length > 0,
       remarks: log.remarks || '',
+      postedDate: this.toLocalString(log.postedDate),
       existingAttachments: (log.attachments || []).map(a => ({
         fileKey: a.fileKey,
         name: a.name || '',
@@ -50,6 +70,34 @@ Views.post = {
       })),
       newAttachments: []
     };
+  },
+  
+  /**
+   * 現在時刻を 'YYYY-MM-DDTHH:mm' 形式で返す (datetime-local input用)
+   */
+  getNowLocalString() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day}T${h}:${min}`;
+  },
+  
+  /**
+   * ISO文字列を 'YYYY-MM-DDTHH:mm' 形式に変換 (ローカル時刻)
+   */
+  toLocalString(isoString) {
+    if (!isoString) return this.getNowLocalString();
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return this.getNowLocalString();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day}T${h}:${min}`;
   },
   
   render(container, appState) {
@@ -63,7 +111,7 @@ Views.post = {
           <div class="form-info-label">投稿者</div>
           <div class="form-info-value">${escapeHtml(advisor.name)} (${escapeHtml(advisor.affiliation)})</div>
           ${currentDispatch && !isEdit ? `
-            <div class="form-info-label" style="margin-top: 6px;">関連案件</div>
+            <div class="form-info-label" style="margin-top: 8px;">関連案件</div>
             <div class="form-info-value">${escapeHtml(currentDispatch.disasterName)}</div>
           ` : ''}
         </div>
@@ -89,23 +137,35 @@ Views.post = {
         </div>
         
         <div class="form-group">
+          <label class="form-label">投稿日時 <span class="required">*</span></label>
+          <input id="f-posted-date" class="form-input" type="datetime-local" 
+                 value="${s.postedDate}">
+        </div>
+        
+        <div class="form-group">
           <label class="form-label">タイトル <span class="required">*</span></label>
           <input id="f-title" class="form-input" type="text" 
-                 placeholder="ニーズ受付電話の混乱を防ぐコツ"
                  value="${escapeHtml(s.title)}">
         </div>
         
         <div class="form-group">
           <label class="form-label">内容 <span class="required">*</span></label>
-          <textarea id="f-content" class="form-textarea" 
-                    placeholder="現場で気づいたこと、後の人に伝えたいことを書いてください">${escapeHtml(s.content)}</textarea>
+          <textarea id="f-content" class="form-textarea">${escapeHtml(s.content)}</textarea>
         </div>
         
         <div class="form-group">
-          <label class="form-label">タグ (カンマ区切り)</label>
-          <input id="f-tags" class="form-input" type="text" 
-                 placeholder="電話対応, ニーズ受付"
-                 value="${escapeHtml(s.tags)}">
+          <label class="form-label">タグ (タップで選択・複数可)</label>
+          <div class="tag-buttons" id="f-tag-buttons">
+            ${this.PRESET_TAGS.map(t => `
+              <button type="button" class="tag-btn ${s.selectedTags.indexOf(t) !== -1 ? 'active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>
+            `).join('')}
+            <button type="button" class="tag-btn ${s.showOtherInput ? 'active' : ''}" data-tag="__other__">その他</button>
+          </div>
+          <div id="f-tag-other-wrap" class="tag-other-input" style="display: ${s.showOtherInput ? 'block' : 'none'};">
+            <input id="f-tag-other" class="form-input" type="text" 
+                   placeholder="その他のタグ(カンマ区切り)" 
+                   value="${escapeHtml(s.otherTags)}">
+          </div>
         </div>
         
         <div class="form-group">
@@ -113,18 +173,17 @@ Views.post = {
           <div id="attachments-preview" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
           </div>
           <input type="file" id="f-file-input" accept="image/*" multiple style="display: none;">
-          <button type="button" id="f-add-photo-btn" class="btn btn-secondary" style="width: 100%; height: 40px;">
+          <button type="button" id="f-add-photo-btn" class="btn btn-secondary" style="width: 100%; height: 44px;">
             写真を選ぶ・撮る
           </button>
-          <div style="font-size: 11px; color: var(--color-text-muted); margin-top: 4px;">
+          <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 6px;">
             自動で長辺${this.MAX_DIMENSION}pxに縮小されます
           </div>
         </div>
         
         <div class="form-group">
           <label class="form-label">備考</label>
-          <textarea id="f-remarks" class="form-textarea" 
-                    placeholder="補足や、その他伝えておきたいこと">${escapeHtml(s.remarks)}</textarea>
+          <textarea id="f-remarks" class="form-textarea">${escapeHtml(s.remarks)}</textarea>
         </div>
         
         <div class="form-buttons">
@@ -134,14 +193,45 @@ Views.post = {
       </div>
     `;
     
+    // フェーズピル
     container.querySelectorAll('#f-phase-group .pill').forEach(pill => {
       pill.addEventListener('click', () => {
-        container.querySelectorAll('#f-phase-group .pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        this.state.phase = pill.dataset.value;
+        const val = pill.dataset.value;
+        // 同じものをタップしたら解除
+        if (this.state.phase === val) {
+          this.state.phase = '';
+          pill.classList.remove('active');
+        } else {
+          container.querySelectorAll('#f-phase-group .pill').forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+          this.state.phase = val;
+        }
       });
     });
     
+    // タグボタン
+    container.querySelectorAll('#f-tag-buttons .tag-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tag = btn.dataset.tag;
+        if (tag === '__other__') {
+          this.state.showOtherInput = !this.state.showOtherInput;
+          btn.classList.toggle('active', this.state.showOtherInput);
+          const wrapEl = document.getElementById('f-tag-other-wrap');
+          if (wrapEl) wrapEl.style.display = this.state.showOtherInput ? 'block' : 'none';
+        } else {
+          const idx = this.state.selectedTags.indexOf(tag);
+          if (idx === -1) {
+            this.state.selectedTags.push(tag);
+            btn.classList.add('active');
+          } else {
+            this.state.selectedTags.splice(idx, 1);
+            btn.classList.remove('active');
+          }
+        }
+      });
+    });
+    
+    // 写真選択
     document.getElementById('f-add-photo-btn').addEventListener('click', () => {
       const total = this.state.existingAttachments.length + this.state.newAttachments.length;
       if (total >= this.MAX_ATTACHMENTS) {
@@ -234,14 +324,14 @@ Views.post = {
     const existingHtml = this.state.existingAttachments.map((att, i) => `
       <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border); background: var(--color-surface-alt);" data-existing-index="${i}">
         <div class="att-img-slot" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-text-muted);">読み込み中...</div>
-        <button type="button" data-type="existing" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 12px; line-height: 1; cursor: pointer;">×</button>
+        <button type="button" data-type="existing" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 14px; line-height: 1; cursor: pointer;">×</button>
       </div>
     `).join('');
     
     const newHtml = this.state.newAttachments.map((att, i) => `
       <div style="position: relative; width: 80px; height: 80px; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-border);">
         <img src="${att.preview}" style="width: 100%; height: 100%; object-fit: cover;">
-        <button type="button" data-type="new" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 12px; line-height: 1; cursor: pointer;">×</button>
+        <button type="button" data-type="new" data-index="${i}" class="remove-attachment" style="position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 14px; line-height: 1; cursor: pointer;">×</button>
       </div>
     `).join('');
     
@@ -279,8 +369,25 @@ Views.post = {
         slotEl.style.padding = '0';
       }
     } catch (e) {
-      // 失敗時は「読み込み中...」のまま残る
+      // 失敗時は「読み込み中...」のまま
     }
+  },
+  
+  /**
+   * タグをまとめてカンマ区切り文字列に
+   */
+  buildTagsString() {
+    const tags = this.state.selectedTags.slice();
+    if (this.state.showOtherInput) {
+      const otherInputEl = document.getElementById('f-tag-other');
+      const otherText = otherInputEl ? otherInputEl.value.trim() : '';
+      if (otherText) {
+        otherText.split(',').map(t => t.trim()).filter(t => t).forEach(t => {
+          if (tags.indexOf(t) === -1) tags.push(t);
+        });
+      }
+    }
+    return tags.join(',');
   },
   
   collectValues() {
@@ -290,8 +397,9 @@ Views.post = {
       phase: this.state.phase,
       title: document.getElementById('f-title').value.trim(),
       content: document.getElementById('f-content').value.trim(),
-      tags: document.getElementById('f-tags').value.trim(),
+      tags: this.buildTagsString(),
       remarks: document.getElementById('f-remarks').value.trim(),
+      postedDate: document.getElementById('f-posted-date').value,
       existingAttachments: this.state.existingAttachments.map(a => a.fileKey),
       newAttachments: this.state.newAttachments.map(a => ({
         data: a.data,
@@ -319,6 +427,7 @@ Views.post = {
     if (!data.title) { alert('タイトルを入力してください'); return; }
     if (!data.content) { alert('内容を入力してください'); return; }
     if (!data.category) { alert('種別を選択してください'); return; }
+    if (!data.postedDate) { alert('投稿日時を入力してください'); return; }
     
     const isEdit = this.state.mode === 'edit';
     const action = isEdit ? 'updateLog' : 'postLog';
@@ -334,7 +443,6 @@ Views.post = {
       await API.post(action, data);
       App.showLoading(false);
       
-      // 投稿/編集が成功したら一覧キャッシュを破棄
       if (Views.list && Views.list.invalidateCache) {
         Views.list.invalidateCache();
       }
