@@ -2,14 +2,14 @@
 // ホーム画面
 // =========================================
 Views.home = {
-  /**
-   * スケルトン表示 (データロード前)
-   */
   renderSkeleton(container) {
     container.innerHTML = `
       <div class="home-profile">
-        <div class="home-profile-name" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 120px;">&nbsp;</div>
-        <div class="home-profile-affiliation" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 180px; margin-top: 4px;">&nbsp;</div>
+        <div class="home-profile-avatar" style="background: var(--color-surface-alt); color: transparent;">&nbsp;</div>
+        <div class="home-profile-text">
+          <div class="home-profile-name" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 140px;">&nbsp;</div>
+          <div class="home-profile-affiliation" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 200px; margin-top: 4px;">&nbsp;</div>
+        </div>
       </div>
       
       <div class="menu-grid">
@@ -32,23 +32,29 @@ Views.home = {
     `;
   },
   
-  /**
-   * 完全な表示 (データロード後)
-   */
   render(container, state) {
     const { advisor, currentDispatch } = state;
     
+    // アバターのHTML: 写真があれば写真、なければイニシャル
+    const avatarHtml = advisor.photo
+      ? `<img src="${advisor.photo}" alt="${escapeHtml(advisor.name)}">`
+      : escapeHtml((advisor.name || '').charAt(0));
+    
     container.innerHTML = `
       <div class="home-profile">
-        <div class="home-profile-name">${escapeHtml(advisor.name)}</div>
-        <div class="home-profile-affiliation">${escapeHtml(advisor.affiliation)}</div>
+        <div class="home-profile-avatar">${avatarHtml}</div>
+        <div class="home-profile-text">
+          <div class="home-profile-name">${escapeHtml(advisor.name)}</div>
+          <div class="home-profile-affiliation">${escapeHtml(advisor.affiliation)}</div>
+        </div>
       </div>
       
       ${currentDispatch ? `
         <div class="current-dispatch">
+          <div class="current-dispatch-badge">派遣中</div>
           <div class="current-dispatch-label">現在の派遣案件</div>
           <div class="current-dispatch-name">${escapeHtml(currentDispatch.disasterName)}</div>
-          <div class="current-dispatch-sub">${escapeHtml(currentDispatch.dispatchTo)}・派遣中</div>
+          <div class="current-dispatch-sub">${escapeHtml(currentDispatch.dispatchTo)}</div>
         </div>
       ` : ''}
       
@@ -81,4 +87,29 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * 日時を「2026/05/21 14:30」形式で表示
+ */
+function formatDateTime(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}/${m}/${day} ${h}:${min}`;
+}
+
+/**
+ * 日付のみ「2026/05/21」形式 (互換性のため残す)
+ */
+function formatDate(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
 }
