@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ詳細画面
+// 活動ログ詳細画面 (添付ファイル拡張対応)
 // =========================================
 Views.detail = {
   state: {
@@ -7,6 +7,20 @@ Views.detail = {
     loading: false,
     imageCache: {},
     appState: null
+  },
+  
+  isImage(mimeType) {
+    return mimeType && mimeType.startsWith('image/');
+  },
+  
+  getFileIcon(mimeType) {
+    if (!mimeType) return '📎';
+    if (mimeType.startsWith('image/')) return '🖼️';
+    if (mimeType === 'application/pdf') return '📄';
+    if (mimeType.indexOf('word') !== -1) return '📝';
+    if (mimeType.indexOf('sheet') !== -1 || mimeType.indexOf('excel') !== -1) return '📊';
+    if (mimeType.indexOf('presentation') !== -1 || mimeType.indexOf('powerpoint') !== -1) return '📽️';
+    return '📎';
   },
   
   async render(container, appState, recordId) {
@@ -45,7 +59,6 @@ Views.detail = {
     const log = this.state.log;
     const advisor = this.state.appState.advisor;
     const hasAttachments = log.attachments && log.attachments.length > 0;
-    
     const isOwner = advisor && log.authorName === advisor.name;
     
     container.innerHTML = `
@@ -101,13 +114,23 @@ Views.detail = {
         
         ${hasAttachments ? `
           <div class="form-group">
-            <label class="form-label">添付写真 (${log.attachments.length}枚)</label>
+            <label class="form-label">添付ファイル (${log.attachments.length}個)</label>
             <div id="attachment-list" style="display: flex; gap: 8px; flex-wrap: wrap;">
-              ${log.attachments.map((att, i) => `
-                <div class="attachment-item" data-filekey="${escapeHtml(att.fileKey)}" data-index="${i}" style="width: 100px; height: 100px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border); background: var(--color-surface-alt); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden;">
-                  <div style="font-size: 12px; color: var(--color-text-muted);">読み込み中...</div>
+              ${log.attachments.map((att, i) => {
+                const isImg = this.isImage(att.contentType);
+                const icon = this.getFileIcon(att.contentType);
+                return `
+                <div class="attachment-item" data-filekey="${escapeHtml(att.fileKey)}" data-index="${i}" data-mime="${escapeHtml(att.contentType || '')}" data-name="${escapeHtml(att.name || '')}" 
+                     style="width: 110px; min-height: 110px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border); background: var(--color-surface-alt); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; padding: 8px; text-align: center;">
+                  ${isImg
+                    ? `<div class="att-content" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--color-text-muted);">読み込み中...</div>`
+                    : `<div style="font-size: 36px; line-height: 1;">${icon}</div>
+                       <div style="font-size: 11px; color: var(--color-text); margin-top: 6px; word-break: break-all; line-height: 1.3; font-weight: 500;">${escapeHtml((att.name || '').substring(0, 24))}</div>
+                       <div style="font-size: 10px; color: var(--color-primary); margin-top: 4px;">タップで開く</div>`
+                  }
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
           </div>
         ` : ''}
@@ -133,27 +156,80 @@ Views.detail = {
     for (let i = 0; i < log.attachments.length; i++) {
       const att = log.attachments[i];
       const fileKey = att.fileKey;
+      const isImg = this.isImage(att.contentType);
       
-      try {
-        let dataUrl = this.state.imageCache[fileKey];
-        if (!dataUrl) {
-          const base64 = await this.fetchFileAsBase64(fileKey);
-          dataUrl = `data:${att.contentType || 'image/jpeg'};base64,${base64}`;
-          this.state.imageCache[fileKey] = dataUrl;
-        }
-        
-        const itemEl = document.querySelector(`.attachment-item[data-index="${i}"]`);
-        if (itemEl) {
+      const itemEl = document.querySelector(`.attachment-item[data-index="${i}"]`);
+      if (!itemEl) continue;
+      
+      if (isImg) {
+        // 画像はサムネイル表示
+        try {
+          let dataUrl = this.state.imageCache[fileKey];
+          if (!dataUrl) {
+            const base64 = await this.fetchFileAsBase64(fileKey);
+            dataUrl = `data:${att.contentType || 'image/jpeg'};base64,${base64}`;
+            this.state.imageCache[fileKey] = dataUrl;
+          }
+          
           itemEl.innerHTML = `<img src="${dataUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+          itemEl.style.padding = '0';
           itemEl.addEventListener('click', () => this.openModal(dataUrl));
+        } catch (e) {
+          itemEl.innerHTML = '<div style="font-size: 11px; color: var(--color-danger);">取得失敗</div>';
         }
-      } catch (e) {
-        const itemEl = document.querySelector(`.attachment-item[data-index="${i}"]`);
-        if (itemEl) {
-          itemEl.innerHTML = '<div style="font-size: 12px; color: var(--color-danger);">取得失敗</div>';
-        }
+      } else {
+        // それ以外はタップでダウンロード/開く
+        itemEl.addEventListener('click', () => {
+          this.downloadFile(fileKey, att.name, att.contentType);
+        });
       }
     }
+  },
+  
+  /**
+   * ファイルをダウンロードまたは新規タブで開く
+   */
+  async downloadFile(fileKey, fileName, mimeType) {
+    App.showLoading(true);
+    try {
+      const base64 = await this.fetchFileAsBase64(fileKey);
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType || 'application/octet-stream' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // PDFはブラウザで開く、それ以外はダウンロード
+      if (mimeType === 'application/pdf') {
+        const newWin = window.open(blobUrl, '_blank');
+        if (!newWin) {
+          // ポップアップブロックされた場合はダウンロード
+          this.triggerDownload(blobUrl, fileName);
+        }
+      } else {
+        this.triggerDownload(blobUrl, fileName);
+      }
+      
+      // メモリ解放 (少し遅延)
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      
+      App.showLoading(false);
+    } catch (e) {
+      App.showLoading(false);
+      App.showError('ファイルの取得に失敗しました: ' + e.message);
+    }
+  },
+  
+  triggerDownload(blobUrl, fileName) {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fileName || 'download';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   },
   
   fetchFileAsBase64(fileKey) {
