@@ -9,7 +9,7 @@ const CONFIG = {
   GAS_URL: 'https://script.google.com/macros/s/AKfycbw6LC-0u4Bu0xELgbnA83FLWBxl4KMMDsVVMvRACCZvdBitDREqkmdHS7hlZj5HPGS0Mg/exec',
   
   // アプリのバージョン
-  VERSION: '0.5.0',
+  VERSION: '0.6.0',
   
   // 開発モード (true: コンソールにデバッグ出力)
   DEBUG: false,
