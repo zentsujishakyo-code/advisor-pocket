@@ -6,14 +6,11 @@ Views.list = {
     filter: 'all',
     logs: [],
     loaded: false,
-    cacheTime: 0,  // キャッシュ取得時刻 (ms)
+    cacheTime: 0,
   },
   
-  CACHE_TTL: 5 * 60 * 1000,  // キャッシュ有効期限: 5分
+  CACHE_TTL: 5 * 60 * 1000,
   
-  /**
-   * キャッシュを破棄する (投稿・編集・削除後に呼ぶ)
-   */
   invalidateCache() {
     this.state.logs = [];
     this.state.loaded = false;
@@ -40,18 +37,15 @@ Views.list = {
       pill.addEventListener('click', () => {
         if (this.state.filter !== pill.dataset.value) {
           this.state.filter = pill.dataset.value;
-          // フィルタを変えたらキャッシュを破棄して最新を取り直す
           this.invalidateCache();
           this.render(container, appState);
         }
       });
     });
     
-    // キャッシュがあればすぐ表示
     const cacheAge = Date.now() - this.state.cacheTime;
     if (this.state.loaded && cacheAge < this.CACHE_TTL) {
       this.renderList(container);
-      // 裏で最新を取りに行く (バックグラウンド更新)
       this.loadLogs(true).then(() => {
         if (App.state.currentView === 'list') {
           this.renderList(container);
@@ -60,7 +54,6 @@ Views.list = {
       return;
     }
     
-    // キャッシュが無い/期限切れの場合はロード待ち
     await this.loadLogs();
     this.renderList(container);
   },
@@ -105,7 +98,7 @@ Views.list = {
         <div class="log-meta">
           <span>${escapeHtml(log.authorName)}</span>
           <span>·</span>
-          <span>${formatDate(log.postedDate)}</span>
+          <span>${formatDateTime(log.postedDate)}</span>
         </div>
       </div>
     `).join('');
@@ -122,9 +115,3 @@ Views.list = {
     return cat ? cat.replace(/[^a-zA-Z\u4e00-\u9faf]/g, '') : '';
   }
 };
-
-function formatDate(isoDate) {
-  if (!isoDate) return '';
-  const d = new Date(isoDate);
-  return `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
-}
