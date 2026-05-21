@@ -6,7 +6,7 @@ Views.detail = {
     log: null,
     loading: false,
     imageCache: {},
-    appState: null  // App.stateを保持(編集権限判定用)
+    appState: null
   },
   
   async render(container, appState, recordId) {
@@ -46,7 +46,6 @@ Views.detail = {
     const advisor = this.state.appState.advisor;
     const hasAttachments = log.attachments && log.attachments.length > 0;
     
-    // 投稿者本人なら編集・削除ボタンを表示
     const isOwner = advisor && log.authorName === advisor.name;
     
     container.innerHTML = `
@@ -54,11 +53,11 @@ Views.detail = {
         ${isOwner ? `
           <div style="display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px;">
             <button onclick="Views.detail.editLog()" 
-                    style="background: var(--color-surface); border: 0.5px solid var(--color-border); color: var(--color-text); padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer;">
+                    style="background: var(--color-surface); border: 0.5px solid var(--color-border); color: var(--color-text); padding: 8px 16px; border-radius: var(--radius-md); font-size: 13px; cursor: pointer; font-weight: 500;">
               編集
             </button>
             <button onclick="Views.detail.deleteLog()" 
-                    style="background: var(--color-surface); border: 0.5px solid var(--color-danger); color: var(--color-danger); padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer;">
+                    style="background: var(--color-surface); border: 0.5px solid var(--color-danger); color: var(--color-danger); padding: 8px 16px; border-radius: var(--radius-md); font-size: 13px; cursor: pointer; font-weight: 500;">
               削除
             </button>
           </div>
@@ -69,24 +68,24 @@ Views.detail = {
           ${log.phase ? `<span class="badge badge-phase">${escapeHtml(log.phase)}</span>` : ''}
         </div>
         
-        <h2 style="font-size: 17px; font-weight: 500; line-height: 1.5; margin: 0 0 14px 0;">
+        <h2 style="font-size: 19px; font-weight: 600; line-height: 1.5; margin: 0 0 16px 0;">
           ${escapeHtml(log.title)}
         </h2>
         
-        <div class="form-info" style="margin-bottom: 14px;">
+        <div class="form-info" style="margin-bottom: 16px;">
           <div class="form-info-label">投稿者</div>
           <div class="form-info-value">${escapeHtml(log.authorName)} ${log.authorAffiliation ? '(' + escapeHtml(log.authorAffiliation) + ')' : ''}</div>
-          <div class="form-info-label" style="margin-top: 6px;">投稿日</div>
-          <div class="form-info-value">${formatDate(log.postedDate)}</div>
+          <div class="form-info-label" style="margin-top: 8px;">投稿日時</div>
+          <div class="form-info-value">${formatDateTime(log.postedDate)}</div>
           ${log.disasterName ? `
-            <div class="form-info-label" style="margin-top: 6px;">関連案件</div>
+            <div class="form-info-label" style="margin-top: 8px;">関連案件</div>
             <div class="form-info-value">${escapeHtml(log.disasterName)}</div>
           ` : ''}
         </div>
         
         <div class="form-group">
           <label class="form-label">内容</label>
-          <div style="background: var(--color-surface); padding: 12px 14px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border-light); font-size: 14px; line-height: 1.7; white-space: pre-wrap;">${escapeHtml(log.content)}</div>
+          <div style="background: var(--color-surface); padding: 14px 16px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border-light); font-size: 16px; line-height: 1.8; white-space: pre-wrap;">${escapeHtml(log.content)}</div>
         </div>
         
         ${log.tags ? `
@@ -94,7 +93,7 @@ Views.detail = {
             <label class="form-label">タグ</label>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
               ${log.tags.split(',').map(t => t.trim()).filter(t => t).map(t => 
-                `<span style="background: var(--color-surface-alt); color: var(--color-text-muted); font-size: 11px; padding: 4px 10px; border-radius: 12px;">${escapeHtml(t)}</span>`
+                `<span style="background: var(--color-surface-alt); color: var(--color-text-muted); font-size: 12px; padding: 5px 12px; border-radius: 14px;">${escapeHtml(t)}</span>`
               ).join('')}
             </div>
           </div>
@@ -106,7 +105,7 @@ Views.detail = {
             <div id="attachment-list" style="display: flex; gap: 8px; flex-wrap: wrap;">
               ${log.attachments.map((att, i) => `
                 <div class="attachment-item" data-filekey="${escapeHtml(att.fileKey)}" data-index="${i}" style="width: 100px; height: 100px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border); background: var(--color-surface-alt); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden;">
-                  <div style="font-size: 11px; color: var(--color-text-muted);">読み込み中...</div>
+                  <div style="font-size: 12px; color: var(--color-text-muted);">読み込み中...</div>
                 </div>
               `).join('')}
             </div>
@@ -116,7 +115,7 @@ Views.detail = {
         ${log.remarks ? `
           <div class="form-group">
             <label class="form-label">備考</label>
-            <div style="background: var(--color-surface); padding: 12px 14px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border-light); font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: var(--color-text-muted);">${escapeHtml(log.remarks)}</div>
+            <div style="background: var(--color-surface); padding: 12px 14px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border-light); font-size: 14px; line-height: 1.7; white-space: pre-wrap; color: var(--color-text-muted);">${escapeHtml(log.remarks)}</div>
           </div>
         ` : ''}
       </div>
@@ -151,7 +150,7 @@ Views.detail = {
       } catch (e) {
         const itemEl = document.querySelector(`.attachment-item[data-index="${i}"]`);
         if (itemEl) {
-          itemEl.innerHTML = '<div style="font-size: 11px; color: var(--color-danger);">取得失敗</div>';
+          itemEl.innerHTML = '<div style="font-size: 12px; color: var(--color-danger);">取得失敗</div>';
         }
       }
     }
@@ -181,17 +180,11 @@ Views.detail = {
     document.getElementById('image-modal').style.display = 'none';
   },
   
-  /**
-   * 編集ボタンをタップ
-   */
   editLog() {
     Views.post.initEdit(this.state.log);
     App.navigate('post');
   },
   
-  /**
-   * 削除ボタンをタップ
-   */
   async deleteLog() {
     if (!confirm('この活動ログを削除します。よろしいですか？\nこの操作は取り消せません。')) {
       return;
@@ -201,8 +194,7 @@ Views.detail = {
     try {
       await API.post('deleteLog', { recordId: this.state.log.recordId });
       App.showLoading(false);
-
-      // 削除が成功したら一覧キャッシュを破棄
+      
       if (Views.list && Views.list.invalidateCache) {
         Views.list.invalidateCache();
       }
