@@ -15,13 +15,11 @@ const App = {
       return;
     }
     
-    // ヘッダーをすぐ表示してスケルトンを描画 (体感速度UP)
     document.getElementById('app-header').style.display = 'block';
     document.getElementById('loading').style.display = 'none';
     Views.home.renderSkeleton(document.getElementById('main-content'));
     this.state.currentView = 'home';
     
-    // データ読み込みは裏で実行
     this.loadMyInfo();
     
     document.getElementById('back-button').addEventListener('click', () => {
@@ -43,7 +41,6 @@ const App = {
       this.state.advisor = data.advisor;
       this.state.currentDispatch = data.currentDispatch;
       
-      // ホーム画面表示中なら本物のデータで再描画
       if (this.state.currentView === 'home') {
         Views.home.render(document.getElementById('main-content'), this.state);
       }
@@ -52,18 +49,28 @@ const App = {
     }
   },
   
+  /**
+   * ヘッダーのタイトルと副題を切り替える
+   * ホーム画面のみ副題表示、それ以外は副題を隠す
+   */
+  setHeader(title, showSubtitle) {
+    document.getElementById('page-title').textContent = title;
+    const subEl = document.getElementById('page-subtitle');
+    if (subEl) {
+      subEl.style.display = showSubtitle ? 'inline' : 'none';
+    }
+  },
+  
   navigate(viewName, param) {
     const prevView = this.state.currentView;
     this.state.currentView = viewName;
     const main = document.getElementById('main-content');
     const backBtn = document.getElementById('back-button');
-    const title = document.getElementById('page-title');
     
     switch (viewName) {
       case 'home':
         backBtn.style.display = 'none';
-        title.textContent = 'アドバイザーポケット';
-        // データが揃っていればフル描画、まだなら再度スケルトン
+        this.setHeader('アドバイザーポケット', true);
         if (this.state.advisor) {
           Views.home.render(main, this.state);
         } else {
@@ -75,22 +82,22 @@ const App = {
         if (prevView === 'home' || prevView === null) {
           Views.post.initNew();
         }
-        title.textContent = Views.post.state.mode === 'edit' ? '活動ログを編集' : '活動ログを書く';
+        this.setHeader(Views.post.state.mode === 'edit' ? '活動ログを編集' : '活動ログを書く', false);
         Views.post.render(main, this.state);
         break;
       case 'list':
         backBtn.style.display = 'block';
-        title.textContent = '活動ログを見る';
+        this.setHeader('活動ログを見る', false);
         Views.list.render(main, this.state);
         break;
       case 'detail':
         backBtn.style.display = 'block';
-        title.textContent = '活動ログ詳細';
+        this.setHeader('活動ログ詳細', false);
         Views.detail.render(main, this.state, param);
         break;
       case 'profile':
         backBtn.style.display = 'block';
-        title.textContent = 'プロフィール';
+        this.setHeader('プロフィール', false);
         Views.profile.render(main, this.state);
         break;
     }
@@ -112,8 +119,6 @@ function closeError() {
   document.getElementById('error-banner').style.display = 'none';
 }
 
-// 起動
 document.addEventListener('DOMContentLoaded', () => App.init());
 
-// グローバルなViews名前空間
 const Views = {};
