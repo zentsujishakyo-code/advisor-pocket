@@ -7,7 +7,7 @@ const App = {
     advisor: null,
     currentDispatch: null,
     currentView: null,
-    myLogsCommentCounts: [],  // 自分のログとコメント数(未読バッジ計算用)
+    myLogsCommentCounts: [],
   },
   
   init() {
@@ -46,32 +46,43 @@ const App = {
         Views.home.render(document.getElementById('main-content'), this.state);
       }
       
-      // 未読数を取得(バックグラウンド)
       this.loadUnreadCount();
+      // 最新投稿の取得 (ホーム画面用)
+      this.loadRecentLogs();
     } catch (e) {
       this.showError('情報の取得に失敗しました: ' + e.message);
     }
   },
   
-  /**
-   * 自分のログのコメント数を取得して未読バッジ更新
-   */
   async loadUnreadCount() {
     try {
       const data = await API.get('getMyLogsCommentCounts');
       if (data.error) return;
       this.state.myLogsCommentCounts = data.items || [];
       
-      // 未読数を計算
       const unreadCount = UnreadManager.countUnread(this.state.myLogsCommentCounts);
       Views.home.setUnreadCount(unreadCount);
       
-      // ホーム画面表示中なら即時反映
       if (this.state.currentView === 'home' && this.state.advisor) {
         Views.home.render(document.getElementById('main-content'), this.state);
       }
     } catch (e) {
-      // 失敗時は無視(バッジが出ないだけ)
+    }
+  },
+  
+  /**
+   * 最新投稿3件を取得してホーム画面に反映
+   */
+  async loadRecentLogs() {
+    try {
+      const data = await API.get('getLogs', { limit: 3, sortOrder: 'desc' });
+      if (data.error) return;
+      Views.home.setRecentLogs(data.logs || []);
+      
+      if (this.state.currentView === 'home' && this.state.advisor) {
+        Views.home.render(document.getElementById('main-content'), this.state);
+      }
+    } catch (e) {
     }
   },
   
@@ -95,8 +106,8 @@ const App = {
         this.setHeader('アドバイザーポケット', true);
         if (this.state.advisor) {
           Views.home.render(main, this.state);
-          // ホームに戻ったときも未読を再取得
           this.loadUnreadCount();
+          this.loadRecentLogs();
         } else {
           Views.home.renderSkeleton(main);
         }
@@ -123,6 +134,11 @@ const App = {
         backBtn.style.display = 'block';
         this.setHeader('プロフィール', false);
         Views.profile.render(main, this.state);
+        break;
+      case 'howto':
+        backBtn.style.display = 'block';
+        this.setHeader('使い方ガイド', false);
+        Views.howto.render(main, this.state);
         break;
     }
     window.scrollTo(0, 0);
