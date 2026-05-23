@@ -1,9 +1,10 @@
 // =========================================
-// ホーム画面 (未読バッジ表示対応)
+// ホーム画面 (4カード + 最新投稿表示対応)
 // =========================================
 Views.home = {
   state: {
     unreadCount: 0,
+    recentLogs: [],
   },
   
   renderSkeleton(container) {
@@ -32,6 +33,11 @@ Views.home = {
           <div class="menu-card-title">プロフィール</div>
           <div class="menu-card-sub">連絡先・派遣可否</div>
         </div>
+        <div class="menu-card" onclick="App.navigate('howto')">
+          <div class="menu-card-icon">?</div>
+          <div class="menu-card-title">使い方</div>
+          <div class="menu-card-sub">操作ガイド</div>
+        </div>
       </div>
     `;
   },
@@ -46,6 +52,8 @@ Views.home = {
     const unreadBadge = this.state.unreadCount > 0 
       ? `<span class="unread-badge">${this.state.unreadCount > 99 ? '99+' : this.state.unreadCount}</span>` 
       : '';
+    
+    const recentLogsHtml = this.renderRecentLogs();
     
     container.innerHTML = `
       <div class="home-profile">
@@ -82,15 +90,98 @@ Views.home = {
           <div class="menu-card-title">プロフィール</div>
           <div class="menu-card-sub">連絡先・派遣可否</div>
         </div>
+        <div class="menu-card" onclick="App.navigate('howto')">
+          <div class="menu-card-icon">?</div>
+          <div class="menu-card-title">使い方</div>
+          <div class="menu-card-sub">操作ガイド</div>
+        </div>
+      </div>
+      
+      ${recentLogsHtml}
+    `;
+  },
+  
+  /**
+   * 最新投稿エリアを描画
+   */
+  renderRecentLogs() {
+    const logs = this.state.recentLogs;
+    
+    if (!logs || logs.length === 0) {
+      return '';
+    }
+    
+    const itemsHtml = logs.map(log => {
+      const catColor = this.getCatColor(log.category);
+      return `
+        <div class="recent-log-item" onclick="App.navigate('detail', '${log.recordId}')">
+          <div class="recent-log-cat" style="background: ${catColor};">${escapeHtml(log.category)}</div>
+          <div class="recent-log-body">
+            <div class="recent-log-title">${escapeHtml(log.title)}</div>
+            <div class="recent-log-meta">
+              <span>${escapeHtml(log.authorName)}</span>
+              <span>·</span>
+              <span>${this.formatRelativeTime(log.postedDate)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    return `
+      <div class="recent-logs-section">
+        <div class="recent-logs-header">
+          <span>最近の投稿</span>
+          <button onclick="App.navigate('list')" class="recent-logs-link">すべて見る →</button>
+        </div>
+        <div class="recent-logs-list">
+          ${itemsHtml}
+        </div>
       </div>
     `;
   },
   
   /**
-   * 未読数を更新して再描画
+   * 種別ごとの色
    */
+  getCatColor(category) {
+    const map = {
+      '日報': '#5B8FB9',
+      'Tips': '#5B9D5E',
+      '失敗談': '#D4881C',
+      'Q＆A': '#9B6BAF',
+      '資料共有': '#7A7A75',
+    };
+    return map[category] || '#7A7A75';
+  },
+  
+  /**
+   * 相対時刻 (今日, 昨日, X日前, 日付)
+   */
+  formatRelativeTime(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr = Math.floor(diffMs / 3600000);
+    const diffDay = Math.floor(diffMs / 86400000);
+    
+    if (diffMin < 1) return 'たった今';
+    if (diffMin < 60) return `${diffMin}分前`;
+    if (diffHr < 24) return `${diffHr}時間前`;
+    if (diffDay === 1) return '昨日';
+    if (diffDay < 7) return `${diffDay}日前`;
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  },
+  
   setUnreadCount(count) {
     this.state.unreadCount = count;
+  },
+  
+  setRecentLogs(logs) {
+    this.state.recentLogs = logs;
   }
 };
 
@@ -130,10 +221,6 @@ function formatDate(isoString) {
 const UnreadManager = {
   STORAGE_KEY: 'advisor_pocket_read_state',
   
-  /**
-   * 既読状態を全件取得
-   * 戻り値: { logRecordId: { lastSeenCommentCount, lastSeenAt } }
-   */
   getReadState() {
     try {
       const raw = localStorage.getItem(this.STORAGE_KEY);
@@ -143,20 +230,13 @@ const UnreadManager = {
     }
   },
   
-  /**
-   * 既読状態を保存
-   */
   saveReadState(state) {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
-      // 容量超過などは無視
     }
   },
   
-  /**
-   * 特定ログを既読化 (詳細画面表示時に呼ぶ)
-   */
   markAsRead(logRecordId, currentCommentCount) {
     const state = this.getReadState();
     state[logRecordId] = {
@@ -166,10 +246,6 @@ const UnreadManager = {
     this.saveReadState(state);
   },
   
-  /**
-   * 自分のログ一覧 (commentCount付き) から未読数を計算
-   * items: [{ logRecordId, commentCount, latestCommentAt }, ...]
-   */
   countUnread(items) {
     const state = this.getReadState();
     let total = 0;
@@ -183,9 +259,6 @@ const UnreadManager = {
     return total;
   },
   
-  /**
-   * 特定ログが未読か判定
-   */
   isUnread(logRecordId, currentCommentCount) {
     const state = this.getReadState();
     const seen = state[logRecordId];
@@ -193,9 +266,6 @@ const UnreadManager = {
     return currentCommentCount > seenCount;
   },
   
-  /**
-   * 特定ログの未読数を返す
-   */
   getUnreadCount(logRecordId, currentCommentCount) {
     const state = this.getReadState();
     const seen = state[logRecordId];
