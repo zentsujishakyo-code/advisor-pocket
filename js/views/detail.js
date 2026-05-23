@@ -1,12 +1,15 @@
 // =========================================
-// 活動ログ詳細画面 (添付ファイル拡張対応)
+// 活動ログ詳細画面 (コメント機能付き)
 // =========================================
 Views.detail = {
   state: {
     log: null,
     loading: false,
     imageCache: {},
-    appState: null
+    appState: null,
+    comments: [],
+    commentsLoaded: false,
+    editingCommentId: null,  // 編集中のコメントID
   },
   
   isImage(mimeType) {
@@ -25,6 +28,9 @@ Views.detail = {
   
   async render(container, appState, recordId) {
     this.state.appState = appState;
+    this.state.comments = [];
+    this.state.commentsLoaded = false;
+    this.state.editingCommentId = null;
     
     if (recordId) {
       this.state.loading = true;
@@ -49,6 +55,8 @@ Views.detail = {
     
     this.renderLog(container);
     this.loadAttachments();
+    // コメントは「後出し」: ログ本体表示後にバックグラウンドで取得
+    this.loadComments();
   },
   
   renderLoading(container) {
@@ -141,6 +149,20 @@ Views.detail = {
             <div style="background: var(--color-surface); padding: 12px 14px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border-light); font-size: 14px; line-height: 1.7; white-space: pre-wrap; color: var(--color-text-muted);">${escapeHtml(log.remarks)}</div>
           </div>
         ` : ''}
+        
+        <!-- コメント欄 -->
+        <div class="form-group" id="comments-section" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border-light);">
+          <label class="form-label" id="comments-label">コメント</label>
+          <div id="comments-list">
+            <div style="padding: 16px; text-align: center; color: var(--color-text-light); font-size: 13px;">読み込み中...</div>
+          </div>
+          <div style="margin-top: 12px; padding: 12px; background: var(--color-surface); border: 0.5px solid var(--color-border-light); border-radius: var(--radius-md);">
+            <textarea id="comment-input" class="form-textarea" placeholder="コメントを書く..." style="min-height: 60px; margin-bottom: 8px;"></textarea>
+            <button onclick="Views.detail.submitComment()" class="btn btn-primary" style="height: 36px; padding: 0 20px; font-size: 13px;">
+              コメントを投稿
+            </button>
+          </div>
+        </div>
       </div>
       
       <div id="image-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; padding: 20px;" onclick="Views.detail.closeModal()">
@@ -162,7 +184,6 @@ Views.detail = {
       if (!itemEl) continue;
       
       if (isImg) {
-        // 画像はサムネイル表示
         try {
           let dataUrl = this.state.imageCache[fileKey];
           if (!dataUrl) {
@@ -178,7 +199,6 @@ Views.detail = {
           itemEl.innerHTML = '<div style="font-size: 11px; color: var(--color-danger);">取得失敗</div>';
         }
       } else {
-        // それ以外はタップでダウンロード/開く
         itemEl.addEventListener('click', () => {
           this.downloadFile(fileKey, att.name, att.contentType);
         });
@@ -187,7 +207,180 @@ Views.detail = {
   },
   
   /**
-   * ファイルをダウンロードまたは新規タブで開く
+   * コメント取得 (後出し方式)
+   */
+  async loadComments() {
+    if (!this.state.log) return;
+    try {
+      const data = await API.get('getComments', { recordId: this.state.log.recordId });
+      this.state.comments = data.comments || [];
+      this.state.commentsLoaded = true;
+      this.renderComments();
+    } catch (e) {
+      const listEl = document.getElementById('comments-list');
+      if (listEl) {
+        listEl.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--color-danger); font-size: 13px;">コメントの取得に失敗しました</div>';
+      }
+    }
+  },
+  
+  /**
+   * コメント一覧を描画
+   */
+  renderComments() {
+    const listEl = document.getElementById('comments-list');
+    const labelEl = document.getElementById('comments-label');
+    if (!listEl) return;
+    
+    const advisor = this.state.appState.advisor;
+    const comments = this.state.comments;
+    
+    if (labelEl) {
+      labelEl.textContent = `コメント (${comments.length})`;
+    }
+    
+    if (comments.length === 0) {
+      listEl.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--color-text-light); font-size: 13px;">まだコメントはありません</div>';
+      return;
+    }
+    
+    listEl.innerHTML = comments.map(c => {
+      const isMine = advisor && c.authorName === advisor.name;
+      const isEditing = this.state.editingCommentId === c.recordId;
+      
+      if (isEditing) {
+        return `
+          <div style="padding: 12px; background: var(--color-primary-light); border: 0.5px solid var(--color-primary); border-radius: var(--radius-md); margin-bottom: 8px;">
+            <div style="font-size: 12px; color: var(--color-text-muted); margin-bottom: 6px;">
+              <strong style="color: var(--color-text);">${escapeHtml(c.authorName)}</strong>
+              ${c.authorAffiliation ? ' (' + escapeHtml(c.authorAffiliation) + ')' : ''}
+              · ${formatDateTime(c.postedAt)}
+            </div>
+            <textarea id="edit-comment-${c.recordId}" class="form-textarea" style="min-height: 60px; margin-bottom: 8px;">${escapeHtml(c.body)}</textarea>
+            <div style="display: flex; gap: 6px;">
+              <button onclick="Views.detail.saveEditComment('${c.recordId}')" 
+                      style="background: var(--color-primary); color: white; border: none; padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer; font-weight: 500;">
+                保存
+              </button>
+              <button onclick="Views.detail.cancelEditComment()" 
+                      style="background: var(--color-surface); border: 0.5px solid var(--color-border); color: var(--color-text-muted); padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer;">
+                キャンセル
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      
+      return `
+        <div style="padding: 12px; background: var(--color-surface); border: 0.5px solid var(--color-border-light); border-radius: var(--radius-md); margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+            <div style="font-size: 12px; color: var(--color-text-muted);">
+              <strong style="color: var(--color-text);">${escapeHtml(c.authorName)}</strong>
+              ${c.authorAffiliation ? ' (' + escapeHtml(c.authorAffiliation) + ')' : ''}
+              · ${formatDateTime(c.postedAt)}
+            </div>
+            ${isMine ? `
+              <div style="display: flex; gap: 4px;">
+                <button onclick="Views.detail.startEditComment('${c.recordId}')" 
+                        style="background: none; border: none; color: var(--color-text-muted); font-size: 11px; cursor: pointer; padding: 2px 6px;">編集</button>
+                <button onclick="Views.detail.deleteComment('${c.recordId}')" 
+                        style="background: none; border: none; color: var(--color-danger); font-size: 11px; cursor: pointer; padding: 2px 6px;">削除</button>
+              </div>
+            ` : ''}
+          </div>
+          <div style="font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: var(--color-text);">${escapeHtml(c.body)}</div>
+        </div>
+      `;
+    }).join('');
+  },
+  
+  /**
+   * コメント投稿
+   */
+  async submitComment() {
+    const input = document.getElementById('comment-input');
+    if (!input) return;
+    const body = input.value.trim();
+    if (!body) {
+      alert('コメントを入力してください');
+      return;
+    }
+    
+    App.showLoading(true);
+    try {
+      await API.post('postComment', {
+        logRecordId: this.state.log.recordId,
+        body: body
+      });
+      input.value = '';
+      // 再読み込み
+      await this.loadComments();
+      App.showLoading(false);
+    } catch (e) {
+      App.showLoading(false);
+      App.showError('コメント投稿に失敗しました: ' + e.message);
+    }
+  },
+  
+  /**
+   * 編集モードに切り替え
+   */
+  startEditComment(commentId) {
+    this.state.editingCommentId = commentId;
+    this.renderComments();
+  },
+  
+  /**
+   * 編集キャンセル
+   */
+  cancelEditComment() {
+    this.state.editingCommentId = null;
+    this.renderComments();
+  },
+  
+  /**
+   * 編集を保存
+   */
+  async saveEditComment(commentId) {
+    const textarea = document.getElementById('edit-comment-' + commentId);
+    if (!textarea) return;
+    const body = textarea.value.trim();
+    if (!body) {
+      alert('コメントを入力してください');
+      return;
+    }
+    
+    App.showLoading(true);
+    try {
+      await API.post('updateComment', { recordId: commentId, body: body });
+      this.state.editingCommentId = null;
+      await this.loadComments();
+      App.showLoading(false);
+    } catch (e) {
+      App.showLoading(false);
+      App.showError('コメント更新に失敗しました: ' + e.message);
+    }
+  },
+  
+  /**
+   * コメント削除
+   */
+  async deleteComment(commentId) {
+    if (!confirm('このコメントを削除します。よろしいですか?')) return;
+    
+    App.showLoading(true);
+    try {
+      await API.post('deleteComment', { recordId: commentId });
+      await this.loadComments();
+      App.showLoading(false);
+    } catch (e) {
+      App.showLoading(false);
+      App.showError('コメント削除に失敗しました: ' + e.message);
+    }
+  },
+  
+  /**
+   * ファイルダウンロード
    */
   async downloadFile(fileKey, fileName, mimeType) {
     App.showLoading(true);
@@ -202,20 +395,16 @@ Views.detail = {
       const blob = new Blob([byteArray], { type: mimeType || 'application/octet-stream' });
       const blobUrl = URL.createObjectURL(blob);
       
-      // PDFはブラウザで開く、それ以外はダウンロード
       if (mimeType === 'application/pdf') {
         const newWin = window.open(blobUrl, '_blank');
         if (!newWin) {
-          // ポップアップブロックされた場合はダウンロード
           this.triggerDownload(blobUrl, fileName);
         }
       } else {
         this.triggerDownload(blobUrl, fileName);
       }
       
-      // メモリ解放 (少し遅延)
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-      
       App.showLoading(false);
     } catch (e) {
       App.showLoading(false);
