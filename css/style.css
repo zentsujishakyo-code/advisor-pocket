@@ -487,3 +487,61 @@ html, body {
   font-size: 20px;
   cursor: pointer;
 }
+
+
+/* =========================================
+   未読バッジ (コメント通知用)
+   ========================================= */
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #D32F2F;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(211, 47, 47, 0.3);
+}
+
+/* メニューカード右上のバッジ */
+.menu-card {
+  position: relative;
+}
+.menu-card .unread-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* 一覧カードのバッジ */
+.log-card {
+  position: relative;
+}
+.log-card .unread-badge-card {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  background: #D32F2F;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 11px;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(211, 47, 47, 0.3);
+}
+.log-card .unread-badge-card::before {
+  content: '💬 ';
+  margin-right: 2px;
+  font-size: 11px;
+}
