@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ一覧画面 (検索・絞り込み+未読バッジ対応)
+// 活動ログ一覧画面 (検索・絞り込み+未読バッジ+ページング対応)
 // =========================================
 Views.list = {
   state: {
@@ -15,14 +15,18 @@ Views.list = {
     cacheTime: 0,
     filterOptions: { advisors: [], disasters: [] },
     optionsLoaded: false,
+    hasMore: false,  // さらに古いログがあるか
+    loadingMore: false,  // 「もっと読む」処理中フラグ
   },
   
   CACHE_TTL: 5 * 60 * 1000,
+  PAGE_SIZE: 50,
   
   invalidateCache() {
     this.state.logs = [];
     this.state.loaded = false;
     this.state.cacheTime = 0;
+    this.state.hasMore = false;
   },
   
   async render(container, appState) {
@@ -240,12 +244,15 @@ Views.list = {
         disaster: this.state.disaster,
         author: this.state.author,
         sortOrder: this.state.sortOrder,
-        limit: 50
+        limit: this.PAGE_SIZE,
+        offset: 0
       };
       const data = await API.get('getLogs', params);
       this.state.logs = data.logs || [];
       this.state.loaded = true;
       this.state.cacheTime = Date.now();
+      // PAGE_SIZE件取得できたら、さらにある可能性
+      this.state.hasMore = this.state.logs.length === this.PAGE_SIZE;
     } catch (e) {
       if (!silent) {
         App.showError('一覧の取得に失敗しました: ' + e.message);
@@ -254,9 +261,47 @@ Views.list = {
   },
   
   /**
-   * 自分のログの未読コメント数を取得
-   * App.state.myLogsCommentCounts から logRecordId のコメント数を引く
+   * 次のページを読み込んで末尾に追加
    */
+  async loadMore() {
+    if (this.state.loadingMore || !this.state.hasMore) return;
+    
+    this.state.loadingMore = true;
+    const moreBtn = document.getElementById('load-more-btn');
+    if (moreBtn) {
+      moreBtn.textContent = '読み込み中...';
+      moreBtn.disabled = true;
+    }
+    
+    try {
+      const params = {
+        keyword: this.state.keyword,
+        category: this.state.category,
+        phase: this.state.phase,
+        disaster: this.state.disaster,
+        author: this.state.author,
+        sortOrder: this.state.sortOrder,
+        limit: this.PAGE_SIZE,
+        offset: this.state.logs.length
+      };
+      const data = await API.get('getLogs', params);
+      const newLogs = data.logs || [];
+      this.state.logs = this.state.logs.concat(newLogs);
+      this.state.hasMore = newLogs.length === this.PAGE_SIZE;
+      this.state.loadingMore = false;
+      
+      const main = document.getElementById('main-content');
+      this.renderList(main);
+    } catch (e) {
+      this.state.loadingMore = false;
+      if (moreBtn) {
+        moreBtn.textContent = 'さらに読み込む';
+        moreBtn.disabled = false;
+      }
+      App.showError('追加読み込みに失敗しました: ' + e.message);
+    }
+  },
+  
   getUnreadForLog(logRecordId) {
     const items = App.state.myLogsCommentCounts || [];
     const item = items.find(i => i.logRecordId === logRecordId);
@@ -264,9 +309,6 @@ Views.list = {
     return UnreadManager.getUnreadCount(logRecordId, item.commentCount);
   },
   
-  /**
-   * 自分のログか判定
-   */
   isMyLog(authorName) {
     return App.state.advisor && authorName === App.state.advisor.name;
   },
@@ -288,11 +330,10 @@ Views.list = {
     }
     
     let html = `<div style="padding: 8px 16px; font-size: 12px; color: var(--color-text-muted); background: var(--color-bg);">
-      ${this.state.logs.length}件 ${this.hasActiveFilter() ? '(検索結果)' : ''}
+      ${this.state.logs.length}件${this.state.hasMore ? '以上' : ''} ${this.hasActiveFilter() ? '(検索結果)' : ''}
     </div>`;
     
     html += this.state.logs.map(log => {
-      // 自分のログなら未読バッジを表示
       const unreadCount = this.isMyLog(log.authorName) ? this.getUnreadForLog(log.recordId) : 0;
       const unreadBadge = unreadCount > 0 
         ? `<span class="unread-badge-card">${unreadCount > 99 ? '99+' : unreadCount}</span>` 
@@ -316,6 +357,25 @@ Views.list = {
       </div>
     `;
     }).join('');
+    
+    // 「もっと見る」ボタン
+    if (this.state.hasMore) {
+      html += `
+        <div style="padding: 16px; text-align: center;">
+          <button id="load-more-btn" onclick="Views.list.loadMore()" 
+                  style="background: var(--color-surface); border: 0.5px solid var(--color-border); color: var(--color-primary); padding: 12px 24px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; min-width: 180px;">
+            さらに読み込む
+          </button>
+        </div>
+      `;
+    } else if (this.state.logs.length > 0) {
+      // 全件読み終わった
+      html += `
+        <div style="padding: 16px; text-align: center; color: var(--color-text-light); font-size: 12px;">
+          ─ ここまでです ─
+        </div>
+      `;
+    }
     
     listEl.innerHTML = html;
     
