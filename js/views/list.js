@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ一覧画面 (検索・絞り込み対応)
+// 活動ログ一覧画面 (検索・絞り込み+未読バッジ対応)
 // =========================================
 Views.list = {
   state: {
@@ -253,6 +253,24 @@ Views.list = {
     }
   },
   
+  /**
+   * 自分のログの未読コメント数を取得
+   * App.state.myLogsCommentCounts から logRecordId のコメント数を引く
+   */
+  getUnreadForLog(logRecordId) {
+    const items = App.state.myLogsCommentCounts || [];
+    const item = items.find(i => i.logRecordId === logRecordId);
+    if (!item) return 0;
+    return UnreadManager.getUnreadCount(logRecordId, item.commentCount);
+  },
+  
+  /**
+   * 自分のログか判定
+   */
+  isMyLog(authorName) {
+    return App.state.advisor && authorName === App.state.advisor.name;
+  },
+  
   renderList(container) {
     const listEl = container.querySelector('#log-list');
     if (!listEl) return;
@@ -273,8 +291,16 @@ Views.list = {
       ${this.state.logs.length}件 ${this.hasActiveFilter() ? '(検索結果)' : ''}
     </div>`;
     
-    html += this.state.logs.map(log => `
+    html += this.state.logs.map(log => {
+      // 自分のログなら未読バッジを表示
+      const unreadCount = this.isMyLog(log.authorName) ? this.getUnreadForLog(log.recordId) : 0;
+      const unreadBadge = unreadCount > 0 
+        ? `<span class="unread-badge-card">${unreadCount > 99 ? '99+' : unreadCount}</span>` 
+        : '';
+      
+      return `
       <div class="log-card" data-id="${log.recordId}">
+        ${unreadBadge}
         <div class="log-badges">
           <span class="badge badge-cat-${this.sanitizeCat(log.category)}">${escapeHtml(log.category)}</span>
           ${log.phase ? `<span class="badge badge-phase">${escapeHtml(log.phase)}</span>` : ''}
@@ -288,7 +314,8 @@ Views.list = {
           ${log.disasterName ? `<span>·</span><span style="color: var(--color-accent);">${escapeHtml(log.disasterName)}</span>` : ''}
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
     
     listEl.innerHTML = html;
     
