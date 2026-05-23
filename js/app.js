@@ -7,6 +7,7 @@ const App = {
     advisor: null,
     currentDispatch: null,
     currentView: null,
+    myLogsCommentCounts: [],  // 自分のログとコメント数(未読バッジ計算用)
   },
   
   init() {
@@ -44,15 +45,36 @@ const App = {
       if (this.state.currentView === 'home') {
         Views.home.render(document.getElementById('main-content'), this.state);
       }
+      
+      // 未読数を取得(バックグラウンド)
+      this.loadUnreadCount();
     } catch (e) {
       this.showError('情報の取得に失敗しました: ' + e.message);
     }
   },
   
   /**
-   * ヘッダーのタイトルと副題を切り替える
-   * ホーム画面のみ副題表示、それ以外は副題を隠す
+   * 自分のログのコメント数を取得して未読バッジ更新
    */
+  async loadUnreadCount() {
+    try {
+      const data = await API.get('getMyLogsCommentCounts');
+      if (data.error) return;
+      this.state.myLogsCommentCounts = data.items || [];
+      
+      // 未読数を計算
+      const unreadCount = UnreadManager.countUnread(this.state.myLogsCommentCounts);
+      Views.home.setUnreadCount(unreadCount);
+      
+      // ホーム画面表示中なら即時反映
+      if (this.state.currentView === 'home' && this.state.advisor) {
+        Views.home.render(document.getElementById('main-content'), this.state);
+      }
+    } catch (e) {
+      // 失敗時は無視(バッジが出ないだけ)
+    }
+  },
+  
   setHeader(title, showSubtitle) {
     document.getElementById('page-title').textContent = title;
     const subEl = document.getElementById('page-subtitle');
@@ -73,6 +95,8 @@ const App = {
         this.setHeader('アドバイザーポケット', true);
         if (this.state.advisor) {
           Views.home.render(main, this.state);
+          // ホームに戻ったときも未読を再取得
+          this.loadUnreadCount();
         } else {
           Views.home.renderSkeleton(main);
         }
