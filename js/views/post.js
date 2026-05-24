@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ投稿/編集画面
+// 活動ログ投稿/編集画面 (複数派遣対応)
 // =========================================
 Views.post = {
   state: {
@@ -15,7 +15,10 @@ Views.post = {
     remarks: '',
     postedDate: '',
     existingAttachments: [],
-    newAttachments: []
+    newAttachments: [],
+    selectedDispatchIndex: 0,  // 複数派遣中の選択
+    disasterName: '',
+    dispatchTo: '',
   },
   
   MAX_ATTACHMENTS: 3,
@@ -52,7 +55,10 @@ Views.post = {
       remarks: '',
       postedDate: this.getNowLocalString(),
       existingAttachments: [],
-      newAttachments: []
+      newAttachments: [],
+      selectedDispatchIndex: 0,
+      disasterName: '',
+      dispatchTo: '',
     };
   },
   
@@ -78,7 +84,10 @@ Views.post = {
         name: a.name || '',
         contentType: a.contentType || 'application/octet-stream'
       })),
-      newAttachments: []
+      newAttachments: [],
+      selectedDispatchIndex: 0,
+      disasterName: log.disasterName || '',
+      dispatchTo: log.dispatchTo || '',
     };
   },
   
@@ -119,20 +128,63 @@ Views.post = {
   },
   
   render(container, appState) {
-    const { advisor, currentDispatch } = appState;
+    const { advisor, currentDispatches } = appState;
     const s = this.state;
     const isEdit = s.mode === 'edit';
+    const dispatches = currentDispatches || [];
+    
+    // 派遣案件の表示HTML
+    let dispatchInfoHtml = '';
+    if (!isEdit) {
+      if (dispatches.length === 1) {
+        // 1件のみ: 自動付与の表示
+        const d = dispatches[0];
+        dispatchInfoHtml = `
+          <div class="form-info-label" style="margin-top: 8px;">関連案件 (自動付与)</div>
+          <div class="form-info-value">${escapeHtml(d.disasterName)} - ${escapeHtml(d.dispatchTo)}</div>
+        `;
+      } else if (dispatches.length > 1) {
+        // 複数件: 選択UI
+        dispatchInfoHtml = '';
+      }
+    } else if (s.disasterName) {
+      // 編集モード: 既存の値を表示
+      dispatchInfoHtml = `
+        <div class="form-info-label" style="margin-top: 8px;">関連案件</div>
+        <div class="form-info-value">${escapeHtml(s.disasterName)}${s.dispatchTo ? ' - ' + escapeHtml(s.dispatchTo) : ''}</div>
+      `;
+    }
+    
+    // 複数派遣中の選択UI (新規投稿時のみ)
+    let dispatchSelectorHtml = '';
+    if (!isEdit && dispatches.length > 1) {
+      dispatchSelectorHtml = `
+        <div class="form-group">
+          <label class="form-label">関連案件 <span class="required">*</span></label>
+          <div class="dispatch-selector" id="f-dispatch-selector">
+            ${dispatches.map((d, i) => `
+              <div class="dispatch-option ${s.selectedDispatchIndex === i ? 'active' : ''}" data-index="${i}">
+                <div class="dispatch-option-name">${escapeHtml(d.disasterName)}</div>
+                <div class="dispatch-option-sub">${escapeHtml(d.dispatchTo)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 6px;">
+            複数の案件に派遣中のため、関連する案件を選択してください
+          </div>
+        </div>
+      `;
+    }
     
     container.innerHTML = `
       <div class="form-section">
         <div class="form-info">
           <div class="form-info-label">投稿者</div>
           <div class="form-info-value">${escapeHtml(advisor.name)} (${escapeHtml(advisor.affiliation)})</div>
-          ${currentDispatch && !isEdit ? `
-            <div class="form-info-label" style="margin-top: 8px;">関連案件</div>
-            <div class="form-info-value">${escapeHtml(currentDispatch.disasterName)}</div>
-          ` : ''}
+          ${dispatchInfoHtml}
         </div>
+        
+        ${dispatchSelectorHtml}
         
         <div class="form-group">
           <label class="form-label">種別 <span class="required">*</span></label>
@@ -205,6 +257,17 @@ Views.post = {
         </div>
       </div>
     `;
+    
+    // 派遣案件選択
+    container.querySelectorAll('#f-dispatch-selector .dispatch-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const idx = parseInt(opt.dataset.index, 10);
+        this.state.selectedDispatchIndex = idx;
+        container.querySelectorAll('#f-dispatch-selector .dispatch-option').forEach(o => {
+          o.classList.toggle('active', parseInt(o.dataset.index, 10) === idx);
+        });
+      });
+    });
     
     container.querySelectorAll('#f-phase-group .pill').forEach(pill => {
       pill.addEventListener('click', () => {
@@ -442,7 +505,33 @@ Views.post = {
     return tags.join(',');
   },
   
-  collectValues() {
+  collectValues(appState) {
+    const dispatches = (appState && appState.currentDispatches) || [];
+    const isEdit = this.state.mode === 'edit';
+    
+    let disasterName = '';
+    let dispatchTo = '';
+    
+    if (isEdit) {
+      // 編集時は既存値を保持
+      disasterName = this.state.disasterName || '';
+      dispatchTo = this.state.dispatchTo || '';
+    } else {
+      // 新規時
+      if (dispatches.length === 1) {
+        // 1件のみ: 自動付与
+        disasterName = dispatches[0].disasterName;
+        dispatchTo = dispatches[0].dispatchTo;
+      } else if (dispatches.length > 1) {
+        // 複数件: 選択された案件
+        const selected = dispatches[this.state.selectedDispatchIndex];
+        if (selected) {
+          disasterName = selected.disasterName;
+          dispatchTo = selected.dispatchTo;
+        }
+      }
+    }
+    
     return {
       recordId: this.state.recordId,
       category: document.getElementById('f-category').value,
@@ -452,6 +541,8 @@ Views.post = {
       tags: this.buildTagsString(),
       remarks: document.getElementById('f-remarks').value.trim(),
       postedDate: document.getElementById('f-posted-date').value,
+      disasterName: disasterName,
+      dispatchTo: dispatchTo,
       existingAttachments: this.state.existingAttachments.map(a => a.fileKey),
       newAttachments: this.state.newAttachments.map(a => ({
         data: a.data,
@@ -465,7 +556,7 @@ Views.post = {
     if (this.state.mode === 'edit') {
       App.navigate('detail', this.state.recordId);
     } else {
-      const data = this.collectValues();
+      const data = this.collectValues(App.state);
       delete data.newAttachments;
       delete data.existingAttachments;
       localStorage.setItem('advisor_pocket_draft', JSON.stringify(data));
@@ -474,7 +565,7 @@ Views.post = {
   },
   
   async submit() {
-    const data = this.collectValues();
+    const data = this.collectValues(App.state);
     
     if (!data.title) { alert('タイトルを入力してください'); return; }
     if (!data.content) { alert('内容を入力してください'); return; }
