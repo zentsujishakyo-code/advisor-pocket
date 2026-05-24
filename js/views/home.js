@@ -1,5 +1,5 @@
 // =========================================
-// ホーム画面 (4カード + 最新投稿表示対応)
+// ホーム画面 (複数派遣対応)
 // =========================================
 Views.home = {
   state: {
@@ -43,7 +43,7 @@ Views.home = {
   },
   
   render(container, state) {
-    const { advisor, currentDispatch } = state;
+    const { advisor, currentDispatches } = state;
     
     const avatarHtml = advisor.photo
       ? `<img src="${advisor.photo}" alt="${escapeHtml(advisor.name)}">`
@@ -53,6 +53,7 @@ Views.home = {
       ? `<span class="unread-badge">${this.state.unreadCount > 99 ? '99+' : this.state.unreadCount}</span>` 
       : '';
     
+    const dispatchesHtml = this.renderDispatches(currentDispatches);
     const recentLogsHtml = this.renderRecentLogs();
     
     container.innerHTML = `
@@ -64,14 +65,7 @@ Views.home = {
         </div>
       </div>
       
-      ${currentDispatch ? `
-        <div class="current-dispatch">
-          <div class="current-dispatch-badge">派遣中</div>
-          <div class="current-dispatch-label">現在の派遣案件</div>
-          <div class="current-dispatch-name">${escapeHtml(currentDispatch.disasterName)}</div>
-          <div class="current-dispatch-sub">${escapeHtml(currentDispatch.dispatchTo)}</div>
-        </div>
-      ` : ''}
+      ${dispatchesHtml}
       
       <div class="menu-grid">
         <div class="menu-card" onclick="App.navigate('post')">
@@ -98,6 +92,43 @@ Views.home = {
       </div>
       
       ${recentLogsHtml}
+    `;
+  },
+  
+  /**
+   * 派遣中の案件を表示 (複数対応)
+   */
+  renderDispatches(dispatches) {
+    if (!dispatches || dispatches.length === 0) return '';
+    
+    if (dispatches.length === 1) {
+      const d = dispatches[0];
+      return `
+        <div class="current-dispatch">
+          <div class="current-dispatch-badge">派遣中</div>
+          <div class="current-dispatch-label">現在の派遣案件</div>
+          <div class="current-dispatch-name">${escapeHtml(d.disasterName)}</div>
+          <div class="current-dispatch-sub">${escapeHtml(d.dispatchTo)}</div>
+        </div>
+      `;
+    }
+    
+    // 複数派遣中の場合
+    const items = dispatches.map(d => `
+      <div class="current-dispatch-item">
+        <div class="current-dispatch-item-name">${escapeHtml(d.disasterName)}</div>
+        <div class="current-dispatch-item-sub">${escapeHtml(d.dispatchTo)}</div>
+      </div>
+    `).join('');
+    
+    return `
+      <div class="current-dispatch current-dispatch-multi">
+        <div class="current-dispatch-badge">派遣中 ${dispatches.length}件</div>
+        <div class="current-dispatch-label">現在の派遣案件</div>
+        <div class="current-dispatch-items">
+          ${items}
+        </div>
+      </div>
     `;
   },
   
@@ -141,9 +172,6 @@ Views.home = {
     `;
   },
   
-  /**
-   * 種別ごとの色
-   */
   getCatColor(category) {
     const map = {
       '日報': '#5B8FB9',
@@ -155,9 +183,6 @@ Views.home = {
     return map[category] || '#7A7A75';
   },
   
-  /**
-   * 相対時刻 (今日, 昨日, X日前, 日付)
-   */
   formatRelativeTime(isoString) {
     if (!isoString) return '';
     const d = new Date(isoString);
