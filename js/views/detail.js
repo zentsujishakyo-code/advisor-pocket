@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ詳細画面 (派遣先表示対応)
+// 活動ログ詳細画面 (派遣先表示+返信機能)
 // =========================================
 Views.detail = {
   state: {
@@ -68,7 +68,6 @@ Views.detail = {
     const hasAttachments = log.attachments && log.attachments.length > 0;
     const isOwner = advisor && log.authorName === advisor.name;
     
-    // 関連案件の表示 (災害名 + 派遣先)
     let dispatchHtml = '';
     if (log.disasterName) {
       dispatchHtml = `
@@ -292,19 +291,60 @@ Views.detail = {
               ${c.authorAffiliation ? ' (' + escapeHtml(c.authorAffiliation) + ')' : ''}
               · ${formatDateTime(c.postedAt)}
             </div>
-            ${isMine ? `
-              <div style="display: flex; gap: 4px;">
+            <div style="display: flex; gap: 4px;">
+              ${!isMine ? `
+                <button onclick="Views.detail.replyToComment('${escapeHtml(c.authorName)}')" 
+                        style="background: none; border: none; color: var(--color-primary); font-size: 11px; cursor: pointer; padding: 2px 6px; font-weight: 500;">返信</button>
+              ` : ''}
+              ${isMine ? `
                 <button onclick="Views.detail.startEditComment('${c.recordId}')" 
                         style="background: none; border: none; color: var(--color-text-muted); font-size: 11px; cursor: pointer; padding: 2px 6px;">編集</button>
                 <button onclick="Views.detail.deleteComment('${c.recordId}')" 
                         style="background: none; border: none; color: var(--color-danger); font-size: 11px; cursor: pointer; padding: 2px 6px;">削除</button>
-              </div>
-            ` : ''}
+              ` : ''}
+            </div>
           </div>
-          <div style="font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: var(--color-text);">${escapeHtml(c.body)}</div>
+          <div style="font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: var(--color-text);">${this.renderCommentBody(c.body)}</div>
         </div>
       `;
     }).join('');
+  },
+  
+  /**
+   * コメント本文をHTMLに整形。@誰々さん を強調表示する
+   */
+  renderCommentBody(body) {
+    if (!body) return '';
+    const escaped = escapeHtml(body);
+    // @誰々さん の部分を緑色で強調
+    return escaped.replace(/(@[^\s@]+さん)/g, '<span style="color: var(--color-primary); font-weight: 600;">$1</span>');
+  },
+  
+  /**
+   * 返信ボタンを押した時の処理: 入力欄に「@誰々さん 」を挿入してフォーカス
+   */
+  replyToComment(authorName) {
+    const input = document.getElementById('comment-input');
+    if (!input) return;
+    
+    const mention = `@${authorName}さん `;
+    
+    // 既に入力されている内容の先頭に挿入(あるいは空なら新しく)
+    const current = input.value;
+    if (current.startsWith(mention)) {
+      // 既に@誰々さんで始まっている場合は何もしない
+      input.focus();
+      return;
+    }
+    
+    input.value = mention + current;
+    input.focus();
+    // カーソルを末尾に
+    const pos = input.value.length;
+    input.setSelectionRange(pos, pos);
+    
+    // 入力欄までスクロール
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
   },
   
   async submitComment() {
