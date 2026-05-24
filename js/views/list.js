@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ一覧画面 (検索・絞り込み+未読バッジ+ページング対応)
+// 活動ログ一覧画面 (検索・絞り込み+未読バッジ+ページング+派遣先表示)
 // =========================================
 Views.list = {
   state: {
@@ -15,8 +15,8 @@ Views.list = {
     cacheTime: 0,
     filterOptions: { advisors: [], disasters: [] },
     optionsLoaded: false,
-    hasMore: false,  // さらに古いログがあるか
-    loadingMore: false,  // 「もっと読む」処理中フラグ
+    hasMore: false,
+    loadingMore: false,
   },
   
   CACHE_TTL: 5 * 60 * 1000,
@@ -251,7 +251,6 @@ Views.list = {
       this.state.logs = data.logs || [];
       this.state.loaded = true;
       this.state.cacheTime = Date.now();
-      // PAGE_SIZE件取得できたら、さらにある可能性
       this.state.hasMore = this.state.logs.length === this.PAGE_SIZE;
     } catch (e) {
       if (!silent) {
@@ -260,9 +259,6 @@ Views.list = {
     }
   },
   
-  /**
-   * 次のページを読み込んで末尾に追加
-   */
   async loadMore() {
     if (this.state.loadingMore || !this.state.hasMore) return;
     
@@ -339,6 +335,14 @@ Views.list = {
         ? `<span class="unread-badge-card">${unreadCount > 99 ? '99+' : unreadCount}</span>` 
         : '';
       
+      // 関連案件の表示テキスト
+      let dispatchText = '';
+      if (log.disasterName) {
+        dispatchText = log.dispatchTo 
+          ? `${escapeHtml(log.disasterName)} - ${escapeHtml(log.dispatchTo)}`
+          : escapeHtml(log.disasterName);
+      }
+      
       return `
       <div class="log-card" data-id="${log.recordId}">
         ${unreadBadge}
@@ -352,13 +356,12 @@ Views.list = {
           <span>${escapeHtml(log.authorName)}</span>
           <span>·</span>
           <span>${formatDateTime(log.postedDate)}</span>
-          ${log.disasterName ? `<span>·</span><span style="color: var(--color-accent);">${escapeHtml(log.disasterName)}</span>` : ''}
+          ${dispatchText ? `<span>·</span><span style="color: var(--color-accent);">${dispatchText}</span>` : ''}
         </div>
       </div>
     `;
     }).join('');
     
-    // 「もっと見る」ボタン
     if (this.state.hasMore) {
       html += `
         <div style="padding: 16px; text-align: center;">
@@ -369,7 +372,6 @@ Views.list = {
         </div>
       `;
     } else if (this.state.logs.length > 0) {
-      // 全件読み終わった
       html += `
         <div style="padding: 16px; text-align: center; color: var(--color-text-light); font-size: 12px;">
           ─ ここまでです ─
