@@ -1,11 +1,11 @@
 // =========================================
-// アプリのメインコントローラ
+// アプリのメインコントローラ (複数派遣対応)
 // =========================================
 
 const App = {
   state: {
     advisor: null,
-    currentDispatch: null,
+    currentDispatches: [],  // 配列に変更
     currentView: null,
     myLogsCommentCounts: [],
   },
@@ -40,14 +40,13 @@ const App = {
     try {
       const data = await API.get('getMyInfo');
       this.state.advisor = data.advisor;
-      this.state.currentDispatch = data.currentDispatch;
+      this.state.currentDispatches = data.currentDispatches || [];
       
       if (this.state.currentView === 'home') {
         Views.home.render(document.getElementById('main-content'), this.state);
       }
       
       this.loadUnreadCount();
-      // 最新投稿の取得 (ホーム画面用)
       this.loadRecentLogs();
     } catch (e) {
       this.showError('情報の取得に失敗しました: ' + e.message);
@@ -70,9 +69,6 @@ const App = {
     }
   },
   
-  /**
-   * 最新投稿3件を取得してホーム画面に反映
-   */
   async loadRecentLogs() {
     try {
       const data = await API.get('getLogs', { limit: 3, sortOrder: 'desc' });
