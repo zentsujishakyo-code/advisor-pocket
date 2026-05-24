@@ -317,8 +317,7 @@ Views.detail = {
     if (!body) return '';
     const escaped = escapeHtml(body);
     // @誰々さん の部分を緑色で強調
-    return escaped.replace(/(@[^\s@]+さん)/g, '<span style="color: var(--color-primary); font-weight: 600;">$1</span>');
-  },
+return escaped.replace(/@[^@\n]{1,30}?さん/g, function(m) { return '<span style="color: var(--color-primary); font-weight: 600;">' + m + '</span>'; });  },
   
   /**
    * 返信ボタンを押した時の処理: 入力欄に「@誰々さん 」を挿入してフォーカス
