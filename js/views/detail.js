@@ -1,5 +1,5 @@
 // =========================================
-// 活動ログ詳細画面 (コメント+既読化対応)
+// 活動ログ詳細画面 (派遣先表示対応)
 // =========================================
 Views.detail = {
   state: {
@@ -68,6 +68,15 @@ Views.detail = {
     const hasAttachments = log.attachments && log.attachments.length > 0;
     const isOwner = advisor && log.authorName === advisor.name;
     
+    // 関連案件の表示 (災害名 + 派遣先)
+    let dispatchHtml = '';
+    if (log.disasterName) {
+      dispatchHtml = `
+        <div class="form-info-label" style="margin-top: 8px;">関連案件</div>
+        <div class="form-info-value">${escapeHtml(log.disasterName)}${log.dispatchTo ? ' - ' + escapeHtml(log.dispatchTo) : ''}</div>
+      `;
+    }
+    
     container.innerHTML = `
       <div class="form-section">
         ${isOwner ? `
@@ -97,10 +106,7 @@ Views.detail = {
           <div class="form-info-value">${escapeHtml(log.authorName)} ${log.authorAffiliation ? '(' + escapeHtml(log.authorAffiliation) + ')' : ''}</div>
           <div class="form-info-label" style="margin-top: 8px;">投稿日時</div>
           <div class="form-info-value">${formatDateTime(log.postedDate)}</div>
-          ${log.disasterName ? `
-            <div class="form-info-label" style="margin-top: 8px;">関連案件</div>
-            <div class="form-info-value">${escapeHtml(log.disasterName)}</div>
-          ` : ''}
+          ${dispatchHtml}
         </div>
         
         <div class="form-group">
@@ -213,15 +219,12 @@ Views.detail = {
       this.state.commentsLoaded = true;
       this.renderComments();
       
-      // 自分のログなら、開いた時点で既読化
       const advisor = this.state.appState.advisor;
       if (advisor && this.state.log.authorName === advisor.name) {
-        // 自分以外のコメント数を数える(getMyLogsCommentCounts_と同じロジック)
         const othersCount = this.state.comments.filter(c => c.authorName !== advisor.name).length;
         if (typeof UnreadManager !== 'undefined') {
           UnreadManager.markAsRead(this.state.log.recordId, othersCount);
         }
-        // App.state.myLogsCommentCountsも更新しておく(一覧に戻ったときに即時反映するため)
         if (App.state.myLogsCommentCounts) {
           const item = App.state.myLogsCommentCounts.find(i => i.logRecordId === this.state.log.recordId);
           if (item) {
