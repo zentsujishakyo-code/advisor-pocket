@@ -31,12 +31,18 @@ Views.home = {
       </div>
       <div class="menu-grid-secondary">
         <div class="menu-card-secondary" onclick="App.navigate('profile')">
-          <span class="menu-card-secondary-icon">◉</span>
-          <span class="menu-card-secondary-title">プロフィール</span>
+          <span class="menu-card-secondary-left">
+            <span class="menu-card-secondary-icon">◉</span>
+            <span class="menu-card-secondary-title">プロフィール</span>
+          </span>
+          <span class="menu-card-secondary-chevron">›</span>
         </div>
         <div class="menu-card-secondary" onclick="App.navigate('howto')">
-          <span class="menu-card-secondary-icon">?</span>
-          <span class="menu-card-secondary-title">使い方</span>
+          <span class="menu-card-secondary-left">
+            <span class="menu-card-secondary-icon">?</span>
+            <span class="menu-card-secondary-title">使い方</span>
+          </span>
+          <span class="menu-card-secondary-chevron">›</span>
         </div>
       </div>
     `;
@@ -63,10 +69,9 @@ Views.home = {
           <div class="home-profile-name">${escapeHtml(advisor.name)}</div>
           <div class="home-profile-affiliation">${escapeHtml(advisor.affiliation)}</div>
         </div>
+        ${dispatchesHtml}
       </div>
-      
-      ${dispatchesHtml}
-      
+
       <div class="menu-grid">
         <div class="menu-card-primary is-write" onclick="App.navigate('post')">
           <div class="menu-card-primary-icon">✎</div>
@@ -82,12 +87,18 @@ Views.home = {
       </div>
       <div class="menu-grid-secondary">
         <div class="menu-card-secondary" onclick="App.navigate('profile')">
-          <span class="menu-card-secondary-icon">◉</span>
-          <span class="menu-card-secondary-title">プロフィール</span>
+          <span class="menu-card-secondary-left">
+            <span class="menu-card-secondary-icon">◉</span>
+            <span class="menu-card-secondary-title">プロフィール</span>
+          </span>
+          <span class="menu-card-secondary-chevron">›</span>
         </div>
         <div class="menu-card-secondary" onclick="App.navigate('howto')">
-          <span class="menu-card-secondary-icon">?</span>
-          <span class="menu-card-secondary-title">使い方</span>
+          <span class="menu-card-secondary-left">
+            <span class="menu-card-secondary-icon">?</span>
+            <span class="menu-card-secondary-title">使い方</span>
+          </span>
+          <span class="menu-card-secondary-chevron">›</span>
         </div>
       </div>
 
@@ -96,38 +107,27 @@ Views.home = {
   },
   
   /**
-   * 派遣中の案件を表示 (複数対応)
+   * ヘッダー内に表示する派遣中バッジ (閲覧専用の情報として、名前・所属の空きスペースに収める)
    */
   renderDispatches(dispatches) {
     if (!dispatches || dispatches.length === 0) return '';
-    
+
     if (dispatches.length === 1) {
       const d = dispatches[0];
       return `
-        <div class="current-dispatch">
-          <div class="current-dispatch-badge">派遣中</div>
-          <div class="current-dispatch-label">現在の派遣案件</div>
-          <div class="current-dispatch-name">${escapeHtml(d.disasterName)}</div>
-          <div class="current-dispatch-sub">${escapeHtml(d.dispatchTo)}</div>
+        <div class="home-profile-dispatch">
+          <div class="home-profile-dispatch-badge">派遣中</div>
+          <div class="home-profile-dispatch-name">${escapeHtml(d.disasterName)}</div>
         </div>
       `;
     }
-    
-    // 複数派遣中の場合
-    const items = dispatches.map(d => `
-      <div class="current-dispatch-item">
-        <div class="current-dispatch-item-name">${escapeHtml(d.disasterName)}</div>
-        <div class="current-dispatch-item-sub">${escapeHtml(d.dispatchTo)}</div>
-      </div>
-    `).join('');
-    
+
+    // 複数派遣中の場合は代表1件+件数のみ表示 (スペースの都合上、全件は表示しない)
+    const first = dispatches[0];
     return `
-      <div class="current-dispatch current-dispatch-multi">
-        <div class="current-dispatch-badge">派遣中 ${dispatches.length}件</div>
-        <div class="current-dispatch-label">現在の派遣案件</div>
-        <div class="current-dispatch-items">
-          ${items}
-        </div>
+      <div class="home-profile-dispatch">
+        <div class="home-profile-dispatch-badge">派遣中 ${dispatches.length}件</div>
+        <div class="home-profile-dispatch-name">${escapeHtml(first.disasterName)} 他${dispatches.length - 1}件</div>
       </div>
     `;
   },
@@ -155,6 +155,7 @@ Views.home = {
               <span>${this.formatRelativeTime(log.postedDate)}</span>
             </div>
           </div>
+          <span class="recent-log-chevron">›</span>
         </div>
       `;
     }).join('');
