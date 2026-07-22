@@ -110,7 +110,7 @@
       }).catch(function(err) {
         alert('発行に失敗しました: ' + JSON.stringify(err));
       });
-    }, '#3B6D11');
+    }, '#14304D');
     
     // 「URLコピー」ボタン
     const copyBtn = createButton('📋 URLをコピー', function() {

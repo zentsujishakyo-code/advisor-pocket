@@ -18,25 +18,25 @@ Views.home = {
       </div>
       
       <div class="menu-grid">
-        <div class="menu-card" onclick="App.navigate('post')">
-          <div class="menu-card-icon">✎</div>
-          <div class="menu-card-title">活動ログを書く</div>
-          <div class="menu-card-sub">日報・Tips・失敗談</div>
+        <div class="menu-card-primary is-write" onclick="App.navigate('post')">
+          <div class="menu-card-primary-icon">✎</div>
+          <div class="menu-card-primary-title">活動ログを書く</div>
+          <div class="menu-card-primary-sub">日報・Tips・失敗談</div>
         </div>
-        <div class="menu-card" onclick="App.navigate('list')">
-          <div class="menu-card-icon">≡</div>
-          <div class="menu-card-title">活動ログを見る</div>
-          <div class="menu-card-sub">過去事例・検索</div>
+        <div class="menu-card-primary is-view" onclick="App.navigate('list')">
+          <div class="menu-card-primary-icon">≡</div>
+          <div class="menu-card-primary-title">活動ログを見る</div>
+          <div class="menu-card-primary-sub">過去事例・検索</div>
         </div>
-        <div class="menu-card" onclick="App.navigate('profile')">
-          <div class="menu-card-icon">◉</div>
-          <div class="menu-card-title">プロフィール</div>
-          <div class="menu-card-sub">連絡先・派遣可否</div>
+      </div>
+      <div class="menu-grid-secondary">
+        <div class="menu-card-secondary" onclick="App.navigate('profile')">
+          <span class="menu-card-secondary-icon">◉</span>
+          <span class="menu-card-secondary-title">プロフィール</span>
         </div>
-        <div class="menu-card" onclick="App.navigate('howto')">
-          <div class="menu-card-icon">?</div>
-          <div class="menu-card-title">使い方</div>
-          <div class="menu-card-sub">操作ガイド</div>
+        <div class="menu-card-secondary" onclick="App.navigate('howto')">
+          <span class="menu-card-secondary-icon">?</span>
+          <span class="menu-card-secondary-title">使い方</span>
         </div>
       </div>
     `;
@@ -68,29 +68,29 @@ Views.home = {
       ${dispatchesHtml}
       
       <div class="menu-grid">
-        <div class="menu-card" onclick="App.navigate('post')">
-          <div class="menu-card-icon">✎</div>
-          <div class="menu-card-title">活動ログを書く</div>
-          <div class="menu-card-sub">日報・Tips・失敗談</div>
+        <div class="menu-card-primary is-write" onclick="App.navigate('post')">
+          <div class="menu-card-primary-icon">✎</div>
+          <div class="menu-card-primary-title">活動ログを書く</div>
+          <div class="menu-card-primary-sub">日報・Tips・失敗談</div>
         </div>
-        <div class="menu-card" onclick="App.navigate('list')">
+        <div class="menu-card-primary is-view" onclick="App.navigate('list')">
           ${unreadBadge}
-          <div class="menu-card-icon">≡</div>
-          <div class="menu-card-title">活動ログを見る</div>
-          <div class="menu-card-sub">過去事例・検索</div>
-        </div>
-        <div class="menu-card" onclick="App.navigate('profile')">
-          <div class="menu-card-icon">◉</div>
-          <div class="menu-card-title">プロフィール</div>
-          <div class="menu-card-sub">連絡先・派遣可否</div>
-        </div>
-        <div class="menu-card" onclick="App.navigate('howto')">
-          <div class="menu-card-icon">?</div>
-          <div class="menu-card-title">使い方</div>
-          <div class="menu-card-sub">操作ガイド</div>
+          <div class="menu-card-primary-icon">≡</div>
+          <div class="menu-card-primary-title">活動ログを見る</div>
+          <div class="menu-card-primary-sub">過去事例・検索</div>
         </div>
       </div>
-      
+      <div class="menu-grid-secondary">
+        <div class="menu-card-secondary" onclick="App.navigate('profile')">
+          <span class="menu-card-secondary-icon">◉</span>
+          <span class="menu-card-secondary-title">プロフィール</span>
+        </div>
+        <div class="menu-card-secondary" onclick="App.navigate('howto')">
+          <span class="menu-card-secondary-icon">?</span>
+          <span class="menu-card-secondary-title">使い方</span>
+        </div>
+      </div>
+
       ${recentLogsHtml}
     `;
   },
