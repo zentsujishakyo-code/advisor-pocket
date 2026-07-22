@@ -160,7 +160,7 @@ Views.post = {
     if (!isEdit && dispatches.length > 1) {
       dispatchSelectorHtml = `
         <div class="form-group">
-          <label class="form-label">関連案件 <span class="required">*</span></label>
+          <label class="field-label req">関連案件 <span class="required">*</span></label>
           <div class="dispatch-selector" id="f-dispatch-selector">
             ${dispatches.map((d, i) => `
               <div class="dispatch-option ${s.selectedDispatchIndex === i ? 'active' : ''}" data-index="${i}">
@@ -187,18 +187,16 @@ Views.post = {
         ${dispatchSelectorHtml}
         
         <div class="form-group">
-          <label class="form-label">種別 <span class="required">*</span></label>
-          <select id="f-category" class="form-select">
-            <option value="日報" ${s.category === '日報' ? 'selected' : ''}>日報</option>
-            <option value="Tips" ${s.category === 'Tips' ? 'selected' : ''}>Tips</option>
-            <option value="失敗談" ${s.category === '失敗談' ? 'selected' : ''}>失敗談</option>
-            <option value="Q＆A" ${s.category === 'Q＆A' ? 'selected' : ''}>Q&amp;A</option>
-            <option value="資料共有" ${s.category === '資料共有' ? 'selected' : ''}>資料共有</option>
-          </select>
+          <label class="field-label req">種別を選ぶ <span class="required">*</span></label>
+          <div class="pill-group cols-3" id="f-category-group">
+            ${['日報', 'Tips', '失敗談', 'Q＆A', '資料共有'].map(c => `
+              <div class="pill ${s.category === c ? 'active' : ''}" data-value="${c}">${c === 'Q＆A' ? 'Q&amp;A' : c}</div>
+            `).join('')}
+          </div>
         </div>
-        
+
         <div class="form-group">
-          <label class="form-label">フェーズ</label>
+          <label class="field-label">フェーズ</label>
           <div class="pill-group" id="f-phase-group">
             ${['立ち上げ期', '安定期', '縮小期', '閉所'].map(p => `
               <div class="pill ${s.phase === p ? 'active' : ''}" data-value="${p}">${p}</div>
@@ -207,22 +205,22 @@ Views.post = {
         </div>
         
         <div class="form-group">
-          <label class="form-label">投稿日時 <span class="required">*</span></label>
+          <label class="field-label req">投稿日時 <span class="required">*</span></label>
           <input id="f-posted-date" class="form-input" type="datetime-local" value="${s.postedDate}">
         </div>
         
         <div class="form-group">
-          <label class="form-label">タイトル <span class="required">*</span></label>
+          <label class="field-label req">タイトル <span class="required">*</span></label>
           <input id="f-title" class="form-input" type="text" value="${escapeHtml(s.title)}">
         </div>
         
         <div class="form-group">
-          <label class="form-label">内容 <span class="required">*</span></label>
+          <label class="field-label req">内容 <span class="required">*</span></label>
           <textarea id="f-content" class="form-textarea">${escapeHtml(s.content)}</textarea>
         </div>
         
         <div class="form-group">
-          <label class="form-label">タグ (タップで選択・複数可)</label>
+          <label class="field-label">タグ (タップで選択・複数可)</label>
           <div class="tag-buttons" id="f-tag-buttons">
             ${this.PRESET_TAGS.map(t => `
               <button type="button" class="tag-btn ${s.selectedTags.indexOf(t) !== -1 ? 'active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>
@@ -235,7 +233,7 @@ Views.post = {
         </div>
         
         <div class="form-group">
-          <label class="form-label">添付ファイル (写真・PDF・Office、最大${this.MAX_ATTACHMENTS}個)</label>
+          <label class="field-label">添付ファイル (写真・PDF・Office、最大${this.MAX_ATTACHMENTS}個)</label>
           <div id="attachments-preview" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;"></div>
           <input type="file" id="f-file-input" accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" multiple style="display: none;">
           <button type="button" id="f-add-photo-btn" class="btn btn-secondary" style="width: 100%; height: 44px;">
@@ -247,7 +245,7 @@ Views.post = {
         </div>
         
         <div class="form-group">
-          <label class="form-label">備考</label>
+          <label class="field-label">備考</label>
           <textarea id="f-remarks" class="form-textarea">${escapeHtml(s.remarks)}</textarea>
         </div>
         
@@ -269,6 +267,17 @@ Views.post = {
       });
     });
     
+    // 種別 (必須・単一選択のため、常にどれか1つが選択された状態を保つ)
+    container.querySelectorAll('#f-category-group .pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const val = pill.dataset.value;
+        this.state.category = val;
+        container.querySelectorAll('#f-category-group .pill').forEach(p => {
+          p.classList.toggle('active', p.dataset.value === val);
+        });
+      });
+    });
+
     container.querySelectorAll('#f-phase-group .pill').forEach(pill => {
       pill.addEventListener('click', () => {
         const val = pill.dataset.value;
@@ -534,7 +543,7 @@ Views.post = {
     
     return {
       recordId: this.state.recordId,
-      category: document.getElementById('f-category').value,
+      category: this.state.category,
       phase: this.state.phase,
       title: document.getElementById('f-title').value.trim(),
       content: document.getElementById('f-content').value.trim(),
