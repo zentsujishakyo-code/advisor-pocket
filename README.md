@@ -27,9 +27,14 @@ advisor-pocket/
 │   └── views/
 │       ├── home.js
 │       ├── post.js
-│       └── list.js
-└── gas/
-    └── backend.js      (GASに貼り付ける)
+│       ├── list.js
+│       ├── detail.js   (活動ログ詳細・派遣先表示・返信機能)
+│       ├── howto.js    (使い方ガイド画面)
+│       └── profile.js  (プロフィール画面)
+├── gas/
+│   └── backend.js      (GASに貼り付ける)
+└── kintone-customizer/
+    └── advisor-token.js (kintone①名簿用: トークン発行・URLコピーボタン)
 ```
 
 ## セットアップ手順
