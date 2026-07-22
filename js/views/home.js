@@ -9,14 +9,15 @@ Views.home = {
   
   renderSkeleton(container) {
     container.innerHTML = `
+      <div class="home-datetime">${getDateTimeLabel()}</div>
       <div class="home-profile">
-        <div class="home-profile-avatar" style="background: var(--color-surface-alt); color: transparent;">&nbsp;</div>
         <div class="home-profile-text">
+          <div class="home-profile-greeting">${getGreeting()}</div>
           <div class="home-profile-name" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 140px;">&nbsp;</div>
           <div class="home-profile-affiliation" style="background: var(--color-surface-alt); color: transparent; border-radius: 4px; width: 200px; margin-top: 4px;">&nbsp;</div>
         </div>
       </div>
-      
+
       <div class="menu-grid">
         <div class="menu-card-primary is-write" onclick="App.navigate('post')">
           <div class="menu-card-primary-icon">✎</div>
@@ -50,23 +51,20 @@ Views.home = {
   
   render(container, state) {
     const { advisor, currentDispatches } = state;
-    
-    const avatarHtml = advisor.photo
-      ? `<img src="${advisor.photo}" alt="${escapeHtml(advisor.name)}">`
-      : escapeHtml((advisor.name || '').charAt(0));
-    
-    const unreadBadge = this.state.unreadCount > 0 
-      ? `<span class="unread-badge">${this.state.unreadCount > 99 ? '99+' : this.state.unreadCount}</span>` 
+
+    const unreadBadge = this.state.unreadCount > 0
+      ? `<span class="unread-badge">${this.state.unreadCount > 99 ? '99+' : this.state.unreadCount}</span>`
       : '';
-    
+
     const dispatchesHtml = this.renderDispatches(currentDispatches);
     const recentLogsHtml = this.renderRecentLogs();
-    
+
     container.innerHTML = `
+      <div class="home-datetime">${getDateTimeLabel()}</div>
       <div class="home-profile">
-        <div class="home-profile-avatar">${avatarHtml}</div>
         <div class="home-profile-text">
-          <div class="home-profile-name">${escapeHtml(advisor.name)}</div>
+          <div class="home-profile-greeting">${getGreeting()}</div>
+          <div class="home-profile-name">${escapeHtml(advisor.name)}さん</div>
           <div class="home-profile-affiliation">${escapeHtml(advisor.affiliation)}</div>
         </div>
         ${dispatchesHtml}
@@ -108,26 +106,20 @@ Views.home = {
   
   /**
    * ヘッダー内に表示する派遣中バッジ (閲覧専用の情報として、名前・所属の空きスペースに収める)
+   * 派遣先名は省略せず、複数件の場合も全件表示する
    */
   renderDispatches(dispatches) {
     if (!dispatches || dispatches.length === 0) return '';
 
-    if (dispatches.length === 1) {
-      const d = dispatches[0];
-      return `
-        <div class="home-profile-dispatch">
-          <div class="home-profile-dispatch-badge">派遣中</div>
-          <div class="home-profile-dispatch-name">${escapeHtml(d.disasterName)}</div>
-        </div>
-      `;
-    }
+    const badgeLabel = dispatches.length === 1 ? '派遣中' : `派遣中 ${dispatches.length}件`;
+    const namesHtml = dispatches
+      .map(d => `<div class="home-profile-dispatch-name">${escapeHtml(d.disasterName)}</div>`)
+      .join('');
 
-    // 複数派遣中の場合は代表1件+件数のみ表示 (スペースの都合上、全件は表示しない)
-    const first = dispatches[0];
     return `
       <div class="home-profile-dispatch">
-        <div class="home-profile-dispatch-badge">派遣中 ${dispatches.length}件</div>
-        <div class="home-profile-dispatch-name">${escapeHtml(first.disasterName)} 他${dispatches.length - 1}件</div>
+        <div class="home-profile-dispatch-badge">${badgeLabel}</div>
+        ${namesHtml}
       </div>
     `;
   },
@@ -210,6 +202,21 @@ Views.home = {
     this.state.recentLogs = logs;
   }
 };
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 10) return 'おはようございます';
+  if (hour >= 10 && hour < 18) return 'こんにちは';
+  return 'こんばんは';
+}
+
+function getDateTimeLabel() {
+  const d = new Date();
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getMonth() + 1}月${d.getDate()}日(${days[d.getDay()]}) ${hh}:${mm}`;
+}
 
 function escapeHtml(str) {
   if (str == null) return '';
