@@ -768,6 +768,7 @@ function updateLog_(advisor, data) {
   });
   if (detailRes.getResponseCode() !== 200) return { error: 'record_not_found' };
   const existing = JSON.parse(detailRes.getContentText()).record;
+
   if (!existing.author_ref || existing.author_ref.value !== advisor.name.value) {
     return { error: 'not_owner' };
   }
@@ -785,13 +786,8 @@ function updateLog_(advisor, data) {
     record['posted_date'] = { value: formatPostedDate_(data.postedDate) };
   }
 
-  // 編集時も派遣先情報を保存
-  if (data.disasterName !== undefined) {
-    record['disaster_name'] = { value: data.disasterName || '' };
-  }
-  if (data.dispatchTo !== undefined) {
-    record['dispatch_to_copy'] = { value: data.dispatchTo || '' };
-  }
+  // disaster_name / dispatch_to_copy は②派遣管理からのルックアップフィールドのため、
+  // 編集時に直接値を書き込むとkintoneに拒否される (新規作成時のみ postLog_ 側で設定する)。
 
   const existingKeys = (data.existingAttachments || []).map(k => ({ fileKey: k }));
   const newKeys = [];
